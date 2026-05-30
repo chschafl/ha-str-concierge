@@ -242,23 +242,58 @@ If `make deploy-ssh` gives you `Connection refused` or `Permission denied`, SSH 
 HA OS doesn't have SSH enabled by default — you install it as an add-on.
 
 1. In HA: **Settings → Add-ons → Add-on Store**
-2. Install **Advanced SSH & Web Terminal** (the community one, not the official one — the official add-on locks you into a restricted shell that breaks `rsync`)
-3. Open the add-on's **Configuration** tab and set:
-   - `username`: `root` (or whatever you want)
-   - `password`: leave blank — we'll use a key
-   - `authorized_keys`: paste your public key (next step)
-   - `ssh.port`: `22` (or pick another if 22 is taken on your network)
-4. Generate an SSH key on your Mac if you don't already have one:
+2. Install **Advanced SSH & Web Terminal** (the community one by Frenck, not the official one — the official add-on locks you into a restricted shell that breaks `rsync`)
+3. Open the add-on's **Configuration** tab. The YAML config matters in three places:
+   ```yaml
+   ssh:
+     username: root
+     password: ""             # leave blank, we use keys
+     authorized_keys:
+       - "ssh-ed25519 AAAA…your-public-key… your-comment"
+     sftp: false
+     compatibility_mode: false
+     port: 22                 # ⚠️ if this is 0 the SSH server is DISABLED
+   packages:
+     - rsync                  # required for `make deploy-ssh` — not installed by default
+   ```
+   - **`ssh.port`** must be `22` (or another port). **A value of `0` disables the SSH server entirely** — you'll get `Connection refused` even though the add-on appears to be running. The add-on log will say `WARNING: SSH port is disabled. Prevent start of SSH server.`
+   - **`packages: [rsync]`** is required for `make deploy-ssh` to work — the add-on doesn't ship rsync by default, and installs Alpine packages listed here on every start.
+   - **`authorized_keys`** is a YAML list, one entry per public key.
+4. Generate an SSH key on your Mac if you don't already have one — and see ["When you're running inside the VS Code dev container"](#when-youre-running-inside-the-vs-code-dev-container) below for the equivalent flow in a container:
    ```bash
    ssh-keygen -t ed25519 -C "ha-dev"        # press Enter through the prompts
-   cat ~/.ssh/id_ed25519.pub                # copy this into authorized_keys above
+   cat ~/.ssh/id_ed25519.pub                # paste this into authorized_keys above
    ```
-5. **Start** (or restart) the add-on. Enable **Start on boot** and **Watchdog**.
+5. **Start** (or restart) the add-on. Enable **Start on boot** and **Watchdog**. Watch the log — you want to see `Starting OpenSSH daemon` and `Server listening on 0.0.0.0 port 22`.
 6. Test from your Mac:
    ```bash
    ssh root@homeassistant.local
+   ssh root@homeassistant.local "rsync --version"   # confirms rsync is on PATH
    ```
-   You should land in a shell inside HA. If so, `make deploy-ssh` will work too.
+   Both should work. If so, `make deploy-ssh` will too.
+
+#### When you're running inside the VS Code dev container
+
+The dev container is its own little Linux box with no SSH keys of its own. If you try to `ssh root@homeassistant.local` from a container terminal, you'll get `Permission denied (publickey)` even though your Mac's keys work fine — the container can't see them.
+
+Two options:
+
+**Option 1 — generate a key inside the container** (quickest, but the key disappears on container rebuild):
+```bash
+# inside the dev container
+ssh-keygen -t ed25519 -C "ha-dev-container" -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub
+```
+Paste the public key into HA's `authorized_keys` (as a new entry — keep your Mac's key too).
+
+**Option 2 — bind-mount your Mac's `~/.ssh` into the container** (permanent, survives rebuilds):
+Add this to `.devcontainer/devcontainer.json`:
+```json
+"mounts": [
+  "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,readonly"
+]
+```
+Rebuild the container. Now your Mac's keys are visible inside the container, and you only need your Mac's pubkey in HA.
 
 #### HA Container (Docker)
 
@@ -275,10 +310,13 @@ Standard `sshd` on the host. Same setup as any Linux box — make sure `sshd` is
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `Connection refused` | SSH not listening on the configured port | Install/start the SSH add-on (above); check `ssh.port` matches what you put in `HASS_SSH` |
+| `Connection refused` and add-on log says `SSH port is disabled` | `ssh.port: 0` in the add-on config | Set `ssh.port: 22` and restart the add-on |
+| `Connection refused` (no add-on log message) | SSH add-on not installed or not started | Install **Advanced SSH & Web Terminal**, start it, enable "Start on boot" |
 | `Could not resolve hostname homeassistant.local` | mDNS not working on your network | Use HA's IP address instead: `HASS_SSH=root@192.168.1.42` |
-| `Permission denied (publickey)` | Your public key isn't in `authorized_keys` | Paste `~/.ssh/id_ed25519.pub` into the SSH add-on's config and restart the add-on |
-| `rsync: command not found` (remote side) | The official "SSH" add-on doesn't include rsync | Switch to **Advanced SSH & Web Terminal** |
+| `Permission denied (publickey)` from your Mac | Your Mac's public key isn't in the add-on's `authorized_keys` | Append `~/.ssh/id_ed25519.pub` to `authorized_keys` in the add-on config, restart the add-on |
+| `Permission denied (publickey)` from inside the dev container | Container has no keys, or the host's keys aren't mounted in | Generate a key inside the container OR bind-mount `~/.ssh` (see ["dev container" section above](#when-youre-running-inside-the-vs-code-dev-container)) |
+| `bash: rsync: command not found` after SSH succeeds | rsync isn't installed in the add-on | Add `packages: [rsync]` to the add-on config and restart |
+| `rsync: command not found` and you can't shell out at all | You're on the **official** "SSH" add-on, which uses a sandboxed shell | Switch to **Advanced SSH & Web Terminal** |
 | `make deploy` (no `-ssh`) fails with "No such file or directory" | `HASS_CONFIG` points at a path that doesn't exist on your Mac | Either fix the path or use `make deploy-ssh` for remote HA |
 | Changes don't show up after deploy | HA cached the old code | **Settings → Devices & Services → STR Concierge → ⋮ → Reload** (or restart HA) |
 
