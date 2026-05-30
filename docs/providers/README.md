@@ -10,11 +10,13 @@ Most users don't need any of this — see the main [README](../../README.md) for
 
 ## Supported providers
 
-| Provider | Doc | Auth | mark_arrived | mark_checked_out |
-|---|---|---|---|---|
-| [Host Tools](https://hosttools.com) | [host_tools.md](host_tools.md) | Bearer token | ✅ | ✅ |
-| Custom Endpoint | [custom_endpoint.md](custom_endpoint.md) | Bearer token | ✅ | ✅ |
-| [Hostfully](https://hostfully.com) | — | API key in header | ✅ | ✅ |
-| [Guesty](https://guesty.com) | — | OAuth2 client credentials | ✅ | ✅ |
+| Provider | Doc | Auth | mark_arrived | mark_checked_out | Verification |
+|---|---|---|---|---|---|
+| [Host Tools](https://hosttools.com) | [host_tools.md](host_tools.md) | Bearer token | ✅ | ✅ | ✅ Tested against the live API |
+| Custom Endpoint | [custom_endpoint.md](custom_endpoint.md) | Bearer token | ✅ | ✅ | ✅ Contract is small enough to verify by inspection |
+| [Hostfully](https://hostfully.com) | — | API key in header | ✅ | ✅ | ⚠️ Not yet verified against a live account |
+| [Guesty](https://guesty.com) | — | OAuth2 client credentials | ✅ | ✅ | ⚠️ Not yet verified against a live account |
+
+The Hostfully and Guesty providers were built from the public API documentation and pass the unit-test suite, but no one has run them against a real account end-to-end. If you do, please [open an issue](https://github.com/chschafl/ha-str-concierge/issues) with your findings — the goal is to promote both to "tested" as soon as we have first-hand confirmation.
 
 Want to add another? See [CONTRIBUTING.md → Adding a new PMS provider](../../CONTRIBUTING.md#adding-a-new-pms-provider).

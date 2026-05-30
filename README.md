@@ -46,11 +46,13 @@ Out of the box you get:
 
 | Provider | Status |
 |---|---|
-| [Host Tools](https://hosttools.com) | ✅ Supported |
-| [Hostfully](https://hostfully.com) | ✅ Supported |
-| [Guesty](https://guesty.com) | ✅ Supported |
+| [Host Tools](https://hosttools.com) | ✅ Supported & tested against the live API |
+| [Hostfully](https://hostfully.com) | ⚠️ Implemented but **not verified against a live account** — use at your own risk |
+| [Guesty](https://guesty.com) | ⚠️ Implemented but **not verified against a live account** — use at your own risk |
 | Your own booking backend | ✅ via Custom Endpoint |
 | Lodgify, Smoobu, OwnerRez, Hospitable, Beds24, …? | Not yet — [community help wanted](CONTRIBUTING.md) |
+
+The Hostfully and Guesty providers were written from the public API docs and pass the unit tests, but nobody has put them in front of a real account yet. If you try one and it works (or doesn't), please [open an issue](https://github.com/chschafl/ha-str-concierge/issues) — first-hand reports are the fastest way to get them promoted to "tested".
 
 If your PMS isn't listed and you'd like to use STR Concierge, the integration is designed so that adding a new backend is a short, self-contained task. See [CONTRIBUTING.md](CONTRIBUTING.md) — even if you don't write the code yourself, opening an issue with details about your PMS's API is a great start.
 
