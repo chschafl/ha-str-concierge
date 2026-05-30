@@ -26,7 +26,7 @@ async def async_setup_entry(
 
 class GuestPresentSensor(STREntity, BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.OCCUPANCY
-    _attr_name = "Guest Present"
+    _attr_translation_key = "guest_present"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)

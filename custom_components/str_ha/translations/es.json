@@ -49,5 +49,65 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "guest": {
+        "name": "Huésped"
+      },
+      "door_code": {
+        "name": "Código de puerta"
+      },
+      "guest_status": {
+        "name": "Estado del huésped",
+        "state": {
+          "reserved": "Reservado",
+          "due_in": "Próxima llegada",
+          "in_house": "En la casa",
+          "departed": "Salido",
+          "vacant": "Libre"
+        }
+      },
+      "house_state": {
+        "name": "Estado de la casa",
+        "state": {
+          "ready": "Lista",
+          "occupied": "Ocupada",
+          "dirty": "Necesita limpieza",
+          "cleaning": "Limpiando"
+        }
+      },
+      "checkin": {
+        "name": "Check-in"
+      },
+      "checkout": {
+        "name": "Check-out"
+      },
+      "lock_access_start": {
+        "name": "Inicio de acceso a la cerradura"
+      },
+      "lock_access_end": {
+        "name": "Fin de acceso a la cerradura"
+      }
+    },
+    "binary_sensor": {
+      "guest_present": {
+        "name": "Huésped presente"
+      }
+    },
+    "button": {
+      "mark_arrived": {
+        "name": "Marcar huésped como llegado"
+      },
+      "mark_departed": {
+        "name": "Marcar huésped como salido"
+      },
+      "mark_cleaning_started": {
+        "name": "Marcar inicio de limpieza"
+      },
+      "mark_ready": {
+        "name": "Marcar como lista"
+      }
+    }
   }
 }

@@ -49,5 +49,65 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "guest": {
+        "name": "Gast"
+      },
+      "door_code": {
+        "name": "Deurcode"
+      },
+      "guest_status": {
+        "name": "Gast-status",
+        "state": {
+          "reserved": "Gereserveerd",
+          "due_in": "Verwacht",
+          "in_house": "In huis",
+          "departed": "Vertrokken",
+          "vacant": "Leeg"
+        }
+      },
+      "house_state": {
+        "name": "Huis-status",
+        "state": {
+          "ready": "Klaar",
+          "occupied": "Bezet",
+          "dirty": "Moet schoongemaakt",
+          "cleaning": "Wordt schoongemaakt"
+        }
+      },
+      "checkin": {
+        "name": "Check-in"
+      },
+      "checkout": {
+        "name": "Check-out"
+      },
+      "lock_access_start": {
+        "name": "Slot-toegang start"
+      },
+      "lock_access_end": {
+        "name": "Slot-toegang einde"
+      }
+    },
+    "binary_sensor": {
+      "guest_present": {
+        "name": "Gast aanwezig"
+      }
+    },
+    "button": {
+      "mark_arrived": {
+        "name": "Gast als aangekomen markeren"
+      },
+      "mark_departed": {
+        "name": "Gast als vertrokken markeren"
+      },
+      "mark_cleaning_started": {
+        "name": "Schoonmaak gestart"
+      },
+      "mark_ready": {
+        "name": "Markeer als klaar"
+      }
+    }
   }
 }

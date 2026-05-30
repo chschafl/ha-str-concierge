@@ -1,9 +1,8 @@
 """Sensor platform for STR Concierge.
 
-Exposes the current guest, guest lifecycle status, house (housekeeping) state,
-and lock-access window as HA sensors. No next-guest sensors — when the current
-guest is `vacant` and the next booking's arrival window opens, that booking
-takes the `Current Guest` slot automatically.
+Exposes the guest, guest lifecycle status, house (housekeeping) state,
+and lock-access window as HA sensors. Single-guest scope — when the booking
+rotates, the new guest takes the same `Guest` entity.
 """
 
 from __future__ import annotations
@@ -42,12 +41,12 @@ async def async_setup_entry(
 
 
 class GuestNameSensor(STREntity, SensorEntity):
-    _attr_name = "Current Guest"
+    _attr_translation_key = "guest"
     _attr_icon = "mdi:account"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)
-        self._attr_unique_id = f"{entry_id}_current_guest_name"
+        self._attr_unique_id = f"{entry_id}_guest_name"
 
     @property
     def native_value(self) -> str | None:
@@ -63,7 +62,7 @@ class GuestNameSensor(STREntity, SensorEntity):
 
 
 class GuestDoorCodeSensor(STREntity, SensorEntity):
-    _attr_name = "Door Code"
+    _attr_translation_key = "door_code"
     _attr_icon = "mdi:lock-smart"
     _attr_entity_registry_visible_default = False  # keep PIN off dashboards by default
 
@@ -78,7 +77,7 @@ class GuestDoorCodeSensor(STREntity, SensorEntity):
 
 
 class GuestStatusSensor(STREntity, SensorEntity):
-    _attr_name = "Guest Status"
+    _attr_translation_key = "guest_status"
     _attr_icon = "mdi:account-clock"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = GUEST_STATES
@@ -101,7 +100,7 @@ class GuestStatusSensor(STREntity, SensorEntity):
 
 
 class HouseStateSensor(STREntity, SensorEntity):
-    _attr_name = "House State"
+    _attr_translation_key = "house_state"
     _attr_icon = "mdi:home-variant"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = HOUSE_STATES
@@ -121,7 +120,7 @@ class _GuestTimestampSensor(STREntity, SensorEntity):
 
 
 class GuestCheckinSensor(_GuestTimestampSensor):
-    _attr_name = "Check-in"
+    _attr_translation_key = "checkin"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)
@@ -134,7 +133,7 @@ class GuestCheckinSensor(_GuestTimestampSensor):
 
 
 class GuestCheckoutSensor(_GuestTimestampSensor):
-    _attr_name = "Check-out"
+    _attr_translation_key = "checkout"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)
@@ -147,7 +146,7 @@ class GuestCheckoutSensor(_GuestTimestampSensor):
 
 
 class LockAccessStartSensor(_GuestTimestampSensor):
-    _attr_name = "Lock Access Start"
+    _attr_translation_key = "lock_access_start"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)
@@ -160,7 +159,7 @@ class LockAccessStartSensor(_GuestTimestampSensor):
 
 
 class LockAccessEndSensor(_GuestTimestampSensor):
-    _attr_name = "Lock Access End"
+    _attr_translation_key = "lock_access_end"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)

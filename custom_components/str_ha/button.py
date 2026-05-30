@@ -36,7 +36,7 @@ async def async_setup_entry(
 class MarkArrivedButton(STREntity, ButtonEntity):
     """Manual override when the lock event was missed."""
 
-    _attr_name = "Mark Guest Arrived"
+    _attr_translation_key = "mark_arrived"
     _attr_icon = "mdi:account-check"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
@@ -52,7 +52,7 @@ class MarkArrivedButton(STREntity, ButtonEntity):
 class MarkDepartedButton(STREntity, ButtonEntity):
     """Manual override to force the current guest into the `departed` state."""
 
-    _attr_name = "Mark Guest Departed"
+    _attr_translation_key = "mark_departed"
     _attr_icon = "mdi:account-arrow-right"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
@@ -66,7 +66,7 @@ class MarkDepartedButton(STREntity, ButtonEntity):
 
 
 class MarkCleaningStartedButton(STREntity, ButtonEntity):
-    _attr_name = "Mark Cleaning Started"
+    _attr_translation_key = "mark_cleaning_started"
     _attr_icon = "mdi:broom"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
@@ -78,7 +78,7 @@ class MarkCleaningStartedButton(STREntity, ButtonEntity):
 
 
 class MarkReadyButton(STREntity, ButtonEntity):
-    _attr_name = "Mark Ready"
+    _attr_translation_key = "mark_ready"
     _attr_icon = "mdi:home-heart"
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
