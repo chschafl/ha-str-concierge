@@ -200,22 +200,98 @@ make symlink         # links custom_components/str_concierge → ~/.homeassistan
 
 Then restart Home Assistant **once** to pick up the symlink. From that point on, every edit to a source file is immediately reflected in HA — just **Settings → Devices & Services → STR Concierge → ⋮ → Reload** to apply changes.
 
-### Remote HA over SSH
+### Configuring the Makefile (`HASS_CONFIG` and `HASS_SSH`)
 
-If your HA runs on a Pi or a separate box, put your SSH target in a `.env` file:
+The Makefile reads two variables to know **where** your Home Assistant lives. Set them once in a `.env` file at the repo root and forget about them:
 
 ```bash
-# .env
-HASS_SSH=user@homeassistant.local
+# .env  (gitignored — your local config only)
 HASS_CONFIG=/config
+HASS_SSH=root@homeassistant.local
 ```
 
-Then:
+#### `HASS_CONFIG` — path to HA's config directory
+
+This is the directory that contains `configuration.yaml`. Where it lives depends on how you run HA:
+
+| HA installation | Typical path |
+|---|---|
+| HA OS / Supervised (running on a Pi, NUC, VM) | `/config` (as seen from inside HA / over SSH) |
+| HA Container (Docker) | Whatever you mounted to `/config` |
+| HA Core (venv install) | `~/.homeassistant` (the default) |
+| Running HA on the same Mac as your dev machine | `~/.homeassistant` |
+
+If you're not sure: in the HA UI, **Settings → System → Repairs → ⋮ → System Information** shows the config dir path.
+
+#### `HASS_SSH` — SSH target for a remote HA
+
+Only needed if HA runs on a different machine. Format is `user@host` or `user@host:port`. Examples:
+
+- HA OS via the **SSH & Web Terminal** add-on: `root@homeassistant.local` (or its IP)
+- A custom Linux install: `pi@192.168.1.42`
+- Non-standard port: `root@homeassistant.local:22222`
+
+Skip this entirely if you're developing on the same machine as HA.
+
+### Setting up SSH access to Home Assistant
+
+If `make deploy-ssh` gives you `Connection refused` or `Permission denied`, SSH isn't set up on the HA side yet. Here's how to fix it for each install type.
+
+#### HA OS / Supervised (the most common case)
+
+HA OS doesn't have SSH enabled by default — you install it as an add-on.
+
+1. In HA: **Settings → Add-ons → Add-on Store**
+2. Install **Advanced SSH & Web Terminal** (the community one, not the official one — the official add-on locks you into a restricted shell that breaks `rsync`)
+3. Open the add-on's **Configuration** tab and set:
+   - `username`: `root` (or whatever you want)
+   - `password`: leave blank — we'll use a key
+   - `authorized_keys`: paste your public key (next step)
+   - `ssh.port`: `22` (or pick another if 22 is taken on your network)
+4. Generate an SSH key on your Mac if you don't already have one:
+   ```bash
+   ssh-keygen -t ed25519 -C "ha-dev"        # press Enter through the prompts
+   cat ~/.ssh/id_ed25519.pub                # copy this into authorized_keys above
+   ```
+5. **Start** (or restart) the add-on. Enable **Start on boot** and **Watchdog**.
+6. Test from your Mac:
+   ```bash
+   ssh root@homeassistant.local
+   ```
+   You should land in a shell inside HA. If so, `make deploy-ssh` will work too.
+
+#### HA Container (Docker)
+
+Containers don't usually have SSH inside them. Two options:
+
+- **SSH to the host** and set `HASS_CONFIG` to the path that's bind-mounted into the container. The Makefile rsyncs to the host filesystem; HA picks up the file changes on the next reload because of the bind mount.
+- Or, use `docker cp` instead of rsync — not built into the Makefile, but doable as a one-liner: `docker cp custom_components/str_concierge homeassistant:/config/custom_components/`.
+
+#### HA Core (Linux venv)
+
+Standard `sshd` on the host. Same setup as any Linux box — make sure `sshd` is running (`sudo systemctl status ssh`) and your public key is in `~/.ssh/authorized_keys` on the HA side.
+
+### Troubleshooting `make deploy` / `make deploy-ssh`
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `Connection refused` | SSH not listening on the configured port | Install/start the SSH add-on (above); check `ssh.port` matches what you put in `HASS_SSH` |
+| `Could not resolve hostname homeassistant.local` | mDNS not working on your network | Use HA's IP address instead: `HASS_SSH=root@192.168.1.42` |
+| `Permission denied (publickey)` | Your public key isn't in `authorized_keys` | Paste `~/.ssh/id_ed25519.pub` into the SSH add-on's config and restart the add-on |
+| `rsync: command not found` (remote side) | The official "SSH" add-on doesn't include rsync | Switch to **Advanced SSH & Web Terminal** |
+| `make deploy` (no `-ssh`) fails with "No such file or directory" | `HASS_CONFIG` points at a path that doesn't exist on your Mac | Either fix the path or use `make deploy-ssh` for remote HA |
+| Changes don't show up after deploy | HA cached the old code | **Settings → Devices & Services → STR Concierge → ⋮ → Reload** (or restart HA) |
+
+### Remote HA over SSH — quick reference
+
+Once SSH is working:
 
 ```bash
 make deploy-ssh         # rsync once
 make deploy-ssh-reload  # rsync + restart HA
 make deploy-watch       # auto-rsync on every save (macOS: fswatch, Linux: inotifywait)
+make restart-ssh        # restart HA without redeploying
+make logs               # tail HA logs (uses HASS_SSH if set, otherwise local file)
 ```
 
 ### Run the test suite

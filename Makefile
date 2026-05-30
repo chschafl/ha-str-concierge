@@ -11,7 +11,9 @@
 # Configuration (override via env or .env file):
 #   HASS_CONFIG   Path to HA config dir  (default: ~/.homeassistant)
 #   HASS_SSH      SSH target for remote HA (e.g. user@homeassistant.local)
-#   HASS_TOKEN    Long-lived access token for HA REST API restarts
+#
+# See CONTRIBUTING.md → "Configuring the Makefile" for setup instructions
+# (including how to enable SSH on HA OS).
 
 -include .env
 HASS_CONFIG ?= $(HOME)/.homeassistant
