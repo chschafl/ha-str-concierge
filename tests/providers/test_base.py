@@ -44,15 +44,3 @@ class TestPickCurrentAndNext:
         assert pd.next_guest is None
 
 
-class TestGuestIsActive:
-    def test_active_within_window(self):
-        g = _guest("x", -1, 1)
-        assert g.is_active is True
-
-    def test_not_active_before_checkin(self):
-        g = _guest("x", 1, 5)
-        assert g.is_active is False
-
-    def test_not_active_after_checkout(self):
-        g = _guest("x", -5, -1)
-        assert g.is_active is False

@@ -3,28 +3,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
 @dataclass
 class Guest:
-    """Represents a guest booking."""
+    """Represents a guest booking. Identity only — lifecycle state is derived
+    by the coordinator from booking times + lock events + the local store."""
 
     booking_id: str
     name: str
     checkin: datetime
     checkout: datetime
-    phone: str | None = None
-    email: str | None = None
     door_code: str | None = None
-    status: str = "confirmed"
-
-    @property
-    def is_active(self) -> bool:
-        """True when within the booking window."""
-        now = datetime.now(self.checkin.tzinfo)
-        return self.checkin <= now <= self.checkout
 
 
 @dataclass
@@ -37,7 +29,7 @@ class Property:
 
 @dataclass
 class PropertyData:
-    """Current + next guest data for a single property."""
+    """Booking data for a single property — what the PMS knows about it."""
 
     property_id: str
     property_name: str
@@ -52,47 +44,34 @@ class STRProvider(ABC):
         self._api_key = api_key
         self._base_url = base_url
 
-    # ------------------------------------------------------------------
-    # Required
-    # ------------------------------------------------------------------
-
     @abstractmethod
     async def get_properties(self) -> list[Property]:
         """Return all properties/listings accessible with this credential."""
 
     @abstractmethod
     async def get_property_data(self, property_id: str) -> PropertyData:
-        """Return current and next guest for the given property."""
+        """Return current and next booking for the given property."""
 
-    # ------------------------------------------------------------------
-    # Optional actions — providers override what they support
-    # ------------------------------------------------------------------
-
+    # Best-effort write-back. Providers override what they support.
     async def mark_arrived(self, booking_id: str) -> bool:
-        """Mark a booking as arrived. Returns True on success."""
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support mark_arrived"
         )
 
     async def mark_checked_out(self, booking_id: str) -> bool:
-        """Mark a booking as checked out. Returns True on success."""
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support mark_checked_out"
         )
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _pick_current_and_next(
         bookings: list[Guest],
     ) -> tuple[Guest | None, Guest | None]:
-        """Given a sorted list of bookings return (current, next)."""
-        now = datetime.now(bookings[0].checkin.tzinfo) if bookings else None
-        if now is None:
+        """Given a list of bookings, return (current, next) by wall-clock time."""
+        if not bookings:
             return None, None
 
+        now = datetime.now(bookings[0].checkin.tzinfo)
         active: list[Guest] = []
         upcoming: list[Guest] = []
         for b in bookings:

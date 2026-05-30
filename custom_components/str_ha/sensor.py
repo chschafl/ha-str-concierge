@@ -1,30 +1,23 @@
-"""Sensor platform for STR HA.
+"""Sensor platform for STR Concierge.
 
-Exposes guest info and lock window times as HA sensor entities.
+Exposes the current guest, guest lifecycle status, house (housekeeping) state,
+and lock-access window as HA sensors. No next-guest sensors — when the current
+guest is `vacant` and the next booking's arrival window opens, that booking
+takes the `Current Guest` slot automatically.
 """
 
 from __future__ import annotations
 
-import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import (
-    CONF_CHECKIN_OFFSET_MINUTES,
-    CONF_CHECKOUT_OFFSET_MINUTES,
-    DEFAULT_CHECKIN_OFFSET_MINUTES,
-    DEFAULT_CHECKOUT_OFFSET_MINUTES,
-    DOMAIN,
-)
+from .const import DOMAIN, GUEST_STATES, HOUSE_STATES
 from .coordinator import STRCoordinator
 from .entity import STREntity
-from .providers.base import Guest
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -33,146 +26,147 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: STRCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    property_ids: list[str] = hass.data[DOMAIN][entry.entry_id]["property_ids"]
 
-    checkin_offset = entry.options.get(CONF_CHECKIN_OFFSET_MINUTES, DEFAULT_CHECKIN_OFFSET_MINUTES)
-    checkout_offset = entry.options.get(CONF_CHECKOUT_OFFSET_MINUTES, DEFAULT_CHECKOUT_OFFSET_MINUTES)
-
-    entities: list[SensorEntity] = []
-    for prop_id in property_ids:
-        for attr in ("name", "phone", "email", "door_code", "status"):
-            entities.append(GuestSensor(coordinator, prop_id, entry.entry_id, "current", attr))
-        entities.append(GuestDatetimeSensor(coordinator, prop_id, entry.entry_id, "current", "checkin"))
-        entities.append(GuestDatetimeSensor(coordinator, prop_id, entry.entry_id, "current", "checkout"))
-
-        for attr in ("name", "phone", "email", "door_code"):
-            entities.append(GuestSensor(coordinator, prop_id, entry.entry_id, "next", attr))
-        entities.append(GuestDatetimeSensor(coordinator, prop_id, entry.entry_id, "next", "checkin"))
-        entities.append(GuestDatetimeSensor(coordinator, prop_id, entry.entry_id, "next", "checkout"))
-
-        entities.append(LockWindowSensor(coordinator, prop_id, entry.entry_id, "start", checkin_offset))
-        entities.append(LockWindowSensor(coordinator, prop_id, entry.entry_id, "end", checkout_offset))
-
-    async_add_entities(entities)
+    async_add_entities(
+        [
+            GuestNameSensor(coordinator, entry.entry_id),
+            GuestDoorCodeSensor(coordinator, entry.entry_id),
+            GuestStatusSensor(coordinator, entry.entry_id),
+            HouseStateSensor(coordinator, entry.entry_id),
+            GuestCheckinSensor(coordinator, entry.entry_id),
+            GuestCheckoutSensor(coordinator, entry.entry_id),
+            LockAccessStartSensor(coordinator, entry.entry_id),
+            LockAccessEndSensor(coordinator, entry.entry_id),
+        ]
+    )
 
 
-class GuestSensor(STREntity, SensorEntity):
-    """A plain text sensor for a guest attribute."""
+class GuestNameSensor(STREntity, SensorEntity):
+    _attr_name = "Current Guest"
+    _attr_icon = "mdi:account"
 
-    _LABELS = {
-        "name": "Name",
-        "phone": "Phone",
-        "email": "Email",
-        "door_code": "Door Code",
-        "status": "Status",
-    }
-
-    def __init__(
-        self,
-        coordinator: STRCoordinator,
-        property_id: str,
-        entry_id: str,
-        slot: str,
-        attribute: str,
-    ) -> None:
-        super().__init__(coordinator, property_id, entry_id)
-        self._slot = slot
-        self._attribute = attribute
-        label = self._LABELS.get(attribute, attribute.replace("_", " ").title())
-        self._attr_name = f"{slot.title()} Guest {label}"
-        self._attr_unique_id = f"{entry_id}_{property_id}_{slot}_guest_{attribute}"
-
-    def _guest(self) -> Guest | None:
-        pd = self.property_data
-        if pd is None:
-            return None
-        return pd.current_guest if self._slot == "current" else pd.next_guest
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_current_guest_name"
 
     @property
     def native_value(self) -> str | None:
-        guest = self._guest()
-        if guest is None:
-            return None
-        return getattr(guest, self._attribute, None)
+        s = self.state_data
+        return s.current_guest.name if s and s.current_guest else None
 
     @property
     def extra_state_attributes(self) -> dict:
-        guest = self._guest()
-        if guest is None:
+        s = self.state_data
+        if not s or not s.current_guest:
             return {}
-        return {"booking_id": guest.booking_id}
+        return {"booking_id": s.current_guest.booking_id}
 
 
-class GuestDatetimeSensor(STREntity, SensorEntity):
-    """A datetime sensor for checkin/checkout times."""
+class GuestDoorCodeSensor(STREntity, SensorEntity):
+    _attr_name = "Door Code"
+    _attr_icon = "mdi:lock-smart"
+    _attr_entity_registry_visible_default = False  # keep PIN off dashboards by default
 
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-
-    def __init__(
-        self,
-        coordinator: STRCoordinator,
-        property_id: str,
-        entry_id: str,
-        slot: str,
-        timing: str,
-    ) -> None:
-        super().__init__(coordinator, property_id, entry_id)
-        self._slot = slot
-        self._timing = timing
-        label = "Check-in" if timing == "checkin" else "Check-out"
-        self._attr_name = f"{slot.title()} Guest {label}"
-        self._attr_unique_id = f"{entry_id}_{property_id}_{slot}_guest_{timing}"
-
-    def _guest(self) -> Guest | None:
-        pd = self.property_data
-        if pd is None:
-            return None
-        return pd.current_guest if self._slot == "current" else pd.next_guest
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_door_code"
 
     @property
-    def native_value(self) -> datetime | None:
-        guest = self._guest()
-        if guest is None:
-            return None
-        return getattr(guest, self._timing, None)
+    def native_value(self) -> str | None:
+        s = self.state_data
+        return s.current_guest.door_code if s and s.current_guest else None
 
 
-class LockWindowSensor(STREntity, SensorEntity):
-    """Exposes the calculated lock access window start/end as a timestamp."""
+class GuestStatusSensor(STREntity, SensorEntity):
+    _attr_name = "Guest Status"
+    _attr_icon = "mdi:account-clock"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = GUEST_STATES
 
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-
-    def __init__(
-        self,
-        coordinator: STRCoordinator,
-        property_id: str,
-        entry_id: str,
-        edge: str,
-        offset_minutes: int,
-    ) -> None:
-        super().__init__(coordinator, property_id, entry_id)
-        self._edge = edge
-        self._offset = timedelta(minutes=offset_minutes)
-        label = "Lock Access Start" if edge == "start" else "Lock Access End"
-        self._attr_name = label
-        self._attr_unique_id = f"{entry_id}_{property_id}_lock_{edge}"
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_guest_status"
 
     @property
-    def native_value(self) -> datetime | None:
-        pd = self.property_data
-        if pd is None:
-            return None
-
-        if self._edge == "start":
-            guest = pd.current_guest or pd.next_guest
-            if guest is None:
-                return None
-            return guest.checkin - self._offset
-        else:
-            if pd.current_guest is None:
-                return None
-            return pd.current_guest.checkout + self._offset
+    def native_value(self) -> str | None:
+        s = self.state_data
+        return s.guest_status if s else None
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {"offset_minutes": int(self._offset.total_seconds() / 60)}
+        s = self.state_data
+        if not s:
+            return {}
+        return {"entered_at": s.entered_at.isoformat() if s.entered_at else None}
+
+
+class HouseStateSensor(STREntity, SensorEntity):
+    _attr_name = "House State"
+    _attr_icon = "mdi:home-variant"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = HOUSE_STATES
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_house_state"
+
+    @property
+    def native_value(self) -> str | None:
+        s = self.state_data
+        return s.house_state if s else None
+
+
+class _GuestTimestampSensor(STREntity, SensorEntity):
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+
+class GuestCheckinSensor(_GuestTimestampSensor):
+    _attr_name = "Check-in"
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_checkin"
+
+    @property
+    def native_value(self) -> datetime | None:
+        s = self.state_data
+        return s.current_guest.checkin if s and s.current_guest else None
+
+
+class GuestCheckoutSensor(_GuestTimestampSensor):
+    _attr_name = "Check-out"
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_checkout"
+
+    @property
+    def native_value(self) -> datetime | None:
+        s = self.state_data
+        return s.current_guest.checkout if s and s.current_guest else None
+
+
+class LockAccessStartSensor(_GuestTimestampSensor):
+    _attr_name = "Lock Access Start"
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_lock_access_start"
+
+    @property
+    def native_value(self) -> datetime | None:
+        s = self.state_data
+        return s.lock_access_start if s else None
+
+
+class LockAccessEndSensor(_GuestTimestampSensor):
+    _attr_name = "Lock Access End"
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_lock_access_end"
+
+    @property
+    def native_value(self) -> datetime | None:
+        s = self.state_data
+        return s.lock_access_end if s else None

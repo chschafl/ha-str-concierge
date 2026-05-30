@@ -32,12 +32,9 @@ DEFAULT_FIELD_MAP = {
     "prop_name": ["name"],
     "booking_id": ["id"],
     "name": ["guestName", "guest_name", "name"],
-    "email": ["guestEmail", "guest_email", "email"],
-    "phone": ["guestPhone", "guest_phone", "phone"],
     "checkin": ["checkIn", "check_in", "startDate", "start_date"],
     "checkout": ["checkOut", "check_out", "endDate", "end_date"],
     "door_code": ["doorCode", "door_code", "accessCode", "pin"],
-    "status": ["status"],
 }
 
 
@@ -115,12 +112,9 @@ class CustomEndpointProvider(STRProvider):
         return Guest(
             booking_id=str(booking_id),
             name=_first(raw, fm["name"], "Unknown"),
-            email=_first(raw, fm["email"]),
-            phone=_first(raw, fm["phone"]),
             checkin=checkin,
             checkout=checkout,
             door_code=_first(raw, fm["door_code"]),
-            status=_first(raw, fm["status"], "confirmed"),
         )
 
     def _parse_property(self, raw: dict) -> Property | None:

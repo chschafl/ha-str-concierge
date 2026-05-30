@@ -1,22 +1,16 @@
 sync_keymaster:
   name: Sync Keymaster Slot
   description: >
-    Write the current guest's door code and lock access window to a
-    Keymaster code slot. The window is automatically adjusted by the
-    checkin/checkout offset configured in the integration options.
+    Write the current guest's door code and lock-access window to a
+    Keymaster code slot. Window is taken from the coordinator's derived
+    lock_access_start / lock_access_end (already includes the configured
+    minutes-before-checkin and minutes-after-checkout offsets).
   fields:
     entry_id:
       name: Entry ID
-      description: The config entry ID of the STR HA integration instance.
+      description: Config entry ID of the STR Concierge integration instance.
       required: true
       example: "abc123def456"
-      selector:
-        text:
-    property_id:
-      name: Property ID
-      description: The property ID to sync (as configured in the integration).
-      required: true
-      example: "listing_001"
       selector:
         text:
     slot:

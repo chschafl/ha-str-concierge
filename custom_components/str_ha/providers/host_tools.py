@@ -13,12 +13,9 @@ Key endpoints used:
 Field mapping from Host Tools JSON → our Guest model:
   _id            → booking_id
   guestName      → name
-  guestEmail     → email
-  guestPhone     → phone
   startDate      → checkin  (ISO-8601)
   endDate        → checkout (ISO-8601)
   doorCode       → door_code
-  status         → status
 
 If Host Tools changes their field names, adjust the _FIELD_MAP constant below.
 """
@@ -41,12 +38,9 @@ BASE_URL = "https://app.hosttools.com/api/v1"
 _RESERVATION_FIELD_MAP = {
     "booking_id": ["_id", "id", "reservationId"],
     "name": ["guestName", "guest_name", "name"],
-    "email": ["guestEmail", "guest_email", "email"],
-    "phone": ["guestPhone", "guest_phone", "phone"],
     "checkin": ["startDate", "checkIn", "check_in", "start_date"],
     "checkout": ["endDate", "checkOut", "check_out", "end_date"],
     "door_code": ["doorCode", "door_code", "accessCode", "access_code"],
-    "status": ["status"],
 }
 
 _LISTING_FIELD_MAP = {
@@ -134,12 +128,9 @@ class HostToolsProvider(STRProvider):
         return Guest(
             booking_id=str(booking_id),
             name=_first(raw, _RESERVATION_FIELD_MAP["name"], "Unknown"),
-            email=_first(raw, _RESERVATION_FIELD_MAP["email"]),
-            phone=_first(raw, _RESERVATION_FIELD_MAP["phone"]),
             checkin=checkin,
             checkout=checkout,
             door_code=_first(raw, _RESERVATION_FIELD_MAP["door_code"]),
-            status=_first(raw, _RESERVATION_FIELD_MAP["status"], "confirmed"),
         )
 
     @staticmethod

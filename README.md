@@ -4,213 +4,164 @@
 [![GitHub release][release-badge]][release-url]
 [![License: MIT][license-badge]][license-url]
 
-**Bring your short-term rental guests into Home Assistant.**
+**A door-lock-aware guest lifecycle for your short-term rental.**
 
-STR Concierge syncs real-time booking data from your property management system — current guest, next guest, door codes, check-in/out times — and turns it all into automatable HA entities. When a new guest checks in, your home reacts automatically.
-
----
-
-## What it does
-
-```
-Your PMS ──► STR Concierge ──► Home Assistant entities
-                                      │
-                    ┌─────────────────┼────────────────────┐
-                    ▼                 ▼                     ▼
-              Automations        Dashboard             Keymaster
-          “Welcome, Alice!”   Guest info card     Door code synced
-          Lights scene on     Check-in time       Access window set
-          Thermostat preset   Door code shown     Lock enabled
-```
-
-No more manually programming door codes, no more forgetting to change the thermostat between guests. STR Concierge is the glue between your bookings and your smart home.
+STR Concierge syncs the current booking from your property management system, latches a real-time "in-house" state when the guest unlocks the door, and surfaces a separate housekeeping state (`ready` / `occupied` / `dirty` / `cleaning`) so your home — and your cleaner — always know what's going on.
 
 ---
 
-## Features at a glance
+## How it works
+
+```
+        PMS booking calendar           Lock unlock event
+                │                              │
+                ▼                              ▼
+        ┌────────────────────────────────────────────┐
+        │             STR Concierge                  │
+        │                                            │
+        │   Guest status:  reserved → due_in →       │
+        │                   in_house → departed →    │
+        │                   vacant                   │
+        │                                            │
+        │   House state:   ready  ↔  occupied        │
+        │                       ↓                    │
+        │                    dirty → cleaning → ready│
+        └────────────────────────────────────────────┘
+                            │
+                            ▼
+                  HA sensors + events
+                (automations, dashboards)
+```
+
+Guest status transitions:
+
+| State | Trigger |
+|---|---|
+| `reserved` | Booking is in the future, outside the arrival window |
+| `due_in` | Now ≥ check-in − arrival window (configurable, default 4 hours) |
+| `in_house` | Lock unlock event observed inside the lock-access window |
+| `departed` | Past check-out + lock courtesy window — held for 10s so automations can react |
+| `vacant` | No current booking, or current guest has fully departed |
+
+House state transitions:
+
+| From → To | Trigger |
+|---|---|
+| `ready` → `occupied` | Guest enters `in_house` |
+| `occupied` → `dirty` | Guest enters `departed` (automatic) |
+| `dirty` → `cleaning` | "Mark Cleaning Started" button |
+| `cleaning` → `ready` | "Mark Ready" button |
+
+---
+
+## Features
 
 | Feature | Details |
 |---|---|
-| **Current & next guest** | Name, phone, email, check-in/out time, door code |
-| **Guest Present sensor** | Binary sensor — perfect for occupancy automations |
-| **Lock window sensors** | Configurable offsets: lock opens N min before check-in, closes N min after check-out |
-| **Action buttons** | Mark Arrived / Mark Checked Out — calls back into your PMS |
-| **Keymaster integration** | One service call writes door code + access window to your Z-Wave/ZigBee lock |
-| **Multiple properties** | Track as many listings as you want |
-| **Guest change events** | Fire HA automations the moment a new guest becomes current |
-| **Polling + planned webhooks** | Default 5-min polling; webhook push coming soon |
+| **Current guest only** | Single source of truth: name, door code, check-in/out, lifecycle status |
+| **Door-lock-driven arrival** | Listens to a configured lock entity or Keymaster slot — latches `in_house` |
+| **Predictable `departed` window** | 10-second observable transition so automations (auto-lock, away mode) fire reliably before rotation |
+| **Housekeeping workflow** | `dirty` / `cleaning` / `ready` with cleaner-facing buttons |
+| **Persistent state** | Uses HA's storage helper so the lock latch survives restarts |
+| **Keymaster integration** | Optional: syncs door code + access window to a Keymaster code slot |
+| **Single property scope** | One integration entry = one property. Add another entry for a second listing |
 
 ---
 
 ## Supported backends
 
-| Provider | Auth type | Arrived | Checked out |
-|---|---|---|---|
-| [Host Tools](https://hosttools.com) | Bearer token | ✅ | ✅ |
-| Custom / Homebrew API | Bearer token | ✅ | ✅ |
-| [Hostfully](https://hostfully.com) | API key | ✅ | ✅ |
-| [Guesty](https://guesty.com) | OAuth2 client credentials | ✅ | ✅ |
-
-**Adding a new provider** takes about 50 lines of Python — see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## Installation
-
-### Via HACS (recommended)
-
-1. Open HACS → **Integrations** → ⋮ menu → **Custom repositories**
-2. Add URL: `https://github.com/chschafl/str-ha` — type **Integration**
-3. Find **STR Concierge** and click **Download**
-4. Restart Home Assistant
-5. **Settings → Devices & Services → Add Integration → STR Concierge**
-
-### Manual
-
-```bash
-# From your HA config directory:
-git clone https://github.com/chschafl/str-ha.git /tmp/str-ha
-cp -r /tmp/str-ha/custom_components/str_ha config/custom_components/
-# Restart Home Assistant
-```
-
----
-
-## Setup walkthrough
-
-### Step 1 — Choose your provider
-
-Pick which property management system you use. If you run your own booking backend, choose **Custom Endpoint**.
-
-### Step 2 — Enter credentials
-
-| Provider | What to enter |
+| Provider | Auth type |
 |---|---|
-| Host Tools | Your Host Tools API access token |
-| Custom Endpoint | Your API token **and** your server’s base URL |
-| Hostfully | Your Hostfully API key |
-| Guesty | `client_id:client_secret` (copy both from the Guesty developer portal, join with a colon) |
-
-The integration validates your credentials live — if it can’t connect, you’ll see a clear error message.
-
-### Step 3 — Select properties
-
-The integration fetches your listing/property list and lets you pick which ones to sync. You can add more later by setting up another integration entry. Set the polling interval (default: 5 minutes — go lower if your PMS rate limits allow it).
-
-### Options (always editable)
-
-After setup, click **Configure** on the integration card to adjust:
-
-- **Lock enabled N minutes before check-in** — e.g. `60` means the door code works from 1 hour before the official check-in time
-- **Lock remains active N minutes after check-out** — e.g. `60` keeps the code valid for 1 hour of grace time after checkout
-- **Keymaster slot name** — set this once and door codes sync automatically on every guest change
+| [Host Tools](https://hosttools.com) | Bearer token |
+| Custom / Homebrew API | Bearer token |
+| [Hostfully](https://hostfully.com) | API key |
+| [Guesty](https://guesty.com) | OAuth2 client credentials |
 
 ---
 
-## Entities reference
+## Setup
 
-For each property you’ll get a **device** grouping all its entities:
+### 1. Choose your provider
+Pick which PMS you use. If you run your own booking backend, choose **Custom Endpoint**.
 
-### 📊 Sensors
+### 2. Enter credentials
+The integration validates your credentials live before continuing.
 
-| Entity | Example value | Notes |
+### 3. Pick the property
+One config entry tracks one property. Set the polling interval (default: 5 minutes).
+
+### 4. Configure (after setup)
+
+| Option | Default | Description |
 |---|---|---|
-| `Current Guest Name` | `Alice Smith` | |
-| `Current Guest Phone` | `+1-555-0100` | |
-| `Current Guest Email` | `alice@example.com` | |
-| `Current Guest Door Code` | `1234` | Keep this off your public dashboard! |
-| `Current Guest Status` | `confirmed` / `arrived` / `checked_out` | |
-| `Current Guest Check-in` | `2025-06-01T15:00:00+00:00` | Timestamp sensor |
-| `Current Guest Check-out` | `2025-06-07T11:00:00+00:00` | Timestamp sensor |
-| `Next Guest Name` | `Bob Jones` | |
-| `Next Guest Phone` | `+1-555-0200` | |
-| `Next Guest Email` | `bob@example.com` | |
-| `Next Guest Door Code` | `5678` | |
-| `Next Guest Check-in` | `2025-06-08T15:00:00+00:00` | |
-| `Next Guest Check-out` | `2025-06-10T11:00:00+00:00` | |
-| `Lock Access Start` | `2025-06-01T14:00:00+00:00` | check-in − offset |
-| `Lock Access End` | `2025-06-07T12:00:00+00:00` | check-out + offset |
+| Arrival window (hours) | 4 | When the guest transitions from `reserved` → `due_in` |
+| Lock minutes before check-in | 0 | How early the lock access window opens |
+| Lock minutes after check-out | 60 | Courtesy window before guest goes `departed` |
+| Lock trigger source | Entity | `entity` (any HA lock/sensor) or `keymaster` (slot events) |
+| Lock entity ID | — | e.g. `lock.front_door` (when trigger source is `entity`) |
+| Unlock states | `unlocked` | Comma-separated states that count as "guest entered" |
+| Keymaster slot | — | Slot name when trigger source is `keymaster` |
 
-### 🔵 Binary Sensors
+---
 
-| Entity | `on` when… |
+## Entities
+
+A single device groups all entities for the property.
+
+### Sensors
+
+| Entity | Example |
 |---|---|
-| `Guest Present` | A current booking exists and the guest hasn’t checked out |
+| `Current Guest` | `Alice Smith` |
+| `Door Code` | `1234` (hidden from dashboards by default) |
+| `Guest Status` | `reserved` / `due_in` / `in_house` / `departed` / `vacant` |
+| `House State` | `ready` / `occupied` / `dirty` / `cleaning` |
+| `Check-in` | `2025-06-01T15:00:00+00:00` |
+| `Check-out` | `2025-06-07T11:00:00+00:00` |
+| `Lock Access Start` | check-in − offset |
+| `Lock Access End` | check-out + offset |
 
-### 🔘 Buttons
+### Binary sensors
+
+| Entity | `on` when |
+|---|---|
+| `Guest Present` | Guest Status is `in_house` |
+
+### Buttons
 
 | Entity | What it does |
 |---|---|
-| `Mark Guest Arrived` | Calls your PMS to mark the booking as checked in |
-| `Mark Guest Checked Out` | Calls your PMS to mark the booking as checked out |
+| `Mark Guest Arrived` | Manual override when the lock event was missed |
+| `Mark Guest Departed` | Force `departed`, hold 10s, then rotate |
+| `Mark Cleaning Started` | House `dirty` → `cleaning` |
+| `Mark Ready` | House `cleaning` → `ready` |
+
+---
+
+## Events
+
+| Event | When it fires |
+|---|---|
+| `str_ha_guest_changed` | Current booking rotated (different `booking_id`) |
+| `str_ha_guest_status_changed` | Guest status transitioned |
+| `str_ha_house_state_changed` | House state transitioned |
+
+All events include `entry_id`, `property_id`, and the previous + new values.
 
 ---
 
 ## Automations
 
-### Welcome new guests
+### Auto-lock and away mode on departure
+The `departed` state is held for 10 seconds so this triggers reliably:
 
 ```yaml
 automation:
-  alias: "STR – Welcome message on guest change"
-  trigger:
-    - platform: event
-      event_type: str_ha_guest_changed
-  condition:
-    - condition: template
-      value_template: "{{ trigger.event.data.current_guest is not none }}"
-  action:
-    - service: notify.mobile_app_my_phone
-      data:
-        title: "New guest checked in 🏡"
-        message: >
-          {{ trigger.event.data.current_guest }} is now at
-          {{ trigger.event.data.property_name }}.
-```
-
-### Set thermostat for arriving guest
-
-```yaml
-automation:
-  alias: "STR – Pre-heat/cool before check-in"
-  trigger:
-    - platform: template
-      # Triggers 2 hours before lock_access_start
-      value_template: >
-        {{ (as_timestamp(states('sensor.beach_house_lock_access_start'))
-            - as_timestamp(now())) | int < 7200 }}
-  action:
-    - service: climate.set_temperature
-      target:
-        entity_id: climate.beach_house_thermostat
-      data:
-        temperature: 72
-```
-
-### Turn lights on when guest arrives
-
-```yaml
-automation:
-  alias: "STR – Lights on when guest present"
+  alias: "STR – Lock down on guest departure"
   trigger:
     - platform: state
-      entity_id: binary_sensor.beach_house_guest_present
-      to: "on"
-  action:
-    - service: scene.turn_on
-      target:
-        entity_id: scene.welcome_lighting
-```
-
-### Lock down after checkout
-
-```yaml
-automation:
-  alias: "STR – Reset home after checkout"
-  trigger:
-    - platform: template
-      value_template: >
-        {{ now() > states('sensor.beach_house_lock_access_end') | as_datetime }}
+      entity_id: sensor.beach_house_guest_status
+      to: "departed"
   action:
     - service: lock.lock
       target:
@@ -222,49 +173,72 @@ automation:
         preset_mode: away
 ```
 
----
-
-## Keymaster integration
-
-[Keymaster](https://github.com/FutureTense/keymaster) manages Z-Wave and ZigBee lock code slots. STR Concierge can write the door code and access window into a Keymaster slot automatically.
-
-### Setup (one-time)
-
-1. In Keymaster, create a code slot named e.g. `str_guest`
-2. In STR Concierge options, set **Keymaster slot name** → `str_guest`
-
-That’s it. From now on, every time the current guest changes, STR Concierge calls the `str_ha.sync_keymaster` service automatically, which sets:
-
-- `input_text.keymaster_str_guest_pin` → guest’s door code
-- `input_boolean.keymaster_str_guest_enabled` → `on`
-- `input_datetime.keymaster_str_guest_date_start_date` → Lock Access Start
-- `input_datetime.keymaster_str_guest_date_end_date` → Lock Access End
-
-### Manual sync
-
-You can also call it yourself (useful in automations or scripts):
-
+### Notify cleaner when the house needs cleaning
 ```yaml
-service: str_ha.sync_keymaster
-data:
-  entry_id: "your_config_entry_id"   # find this in Settings → Devices & Services
-  property_id: "your_property_id"
-  slot: "str_guest"
+automation:
+  alias: "STR – Cleaner notification"
+  trigger:
+    - platform: state
+      entity_id: sensor.beach_house_house_state
+      to: "dirty"
+  action:
+    - service: notify.cleaner_phone
+      data:
+        title: "Beach House ready for cleaning"
+        message: "Guest just checked out."
+```
+
+### Welcome scene when guest unlocks the door
+```yaml
+automation:
+  alias: "STR – Welcome lights"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.beach_house_guest_present
+      to: "on"
+  action:
+    - service: scene.turn_on
+      target:
+        entity_id: scene.welcome_lighting
 ```
 
 ---
 
-## Host Tools notes
+## State storage
 
-STR Concierge targets `https://app.hosttools.com/api/v1` with Bearer auth. Get your API token from the Host Tools dashboard under **Settings → API**.
+The integration uses HA's `helpers.storage.Store` to persist:
 
-The integration uses a flexible field-name map (`_RESERVATION_FIELD_MAP` in `providers/host_tools.py`) that tries multiple candidate JSON keys for each field. If Host Tools ever changes their API response format, you can add the new key name to the list without changing any other code.
+- `current_booking_id` — which PMS booking we're tracking
+- `entered_at` — when the lock latched (`in_house` flag)
+- `dismissed_booking_id` — set after a guest has fully departed, so the PMS calendar can catch up without re-deriving `due_in`
+- `house_state` + `house_state_changed_at`
+
+State survives HA restarts. The 10-second departed-dwell timer is in-memory only; on the unlucky restart mid-dwell, the next poll completes the rotation.
+
+---
+
+## Keymaster integration
+
+[Keymaster](https://github.com/FutureTense/keymaster) can be either the **lock trigger source** (the integration listens for Keymaster's PIN-entered event for a specific slot) or just a **sync target** for door codes.
+
+To sync the current guest's PIN and lock-access window into a Keymaster slot:
+
+```yaml
+service: str_ha.sync_keymaster
+data:
+  entry_id: "your_config_entry_id"
+  slot: "str_guest"
+```
+
+This sets:
+- `input_text.keymaster_str_guest_pin` → guest's door code
+- `input_boolean.keymaster_str_guest_enabled` → on
+- `input_datetime.keymaster_str_guest_date_start_date` → Lock Access Start
+- `input_datetime.keymaster_str_guest_date_end_date` → Lock Access End
 
 ---
 
 ## Custom backend API contract
-
-If you run your own booking system, expose these endpoints:
 
 ```
 GET  /properties
@@ -275,12 +249,9 @@ GET  /reservations?propertyId={id}
          {
            "id": "string",
            "guestName": "string",
-           "guestEmail": "string",
-           "guestPhone": "string",
            "checkIn": "2025-06-01T15:00:00Z",
            "checkOut": "2025-06-07T11:00:00Z",
-           "doorCode": "string",
-           "status": "confirmed|arrived|checked_out"
+           "doorCode": "string"
          }
        ]
 
@@ -288,97 +259,36 @@ POST /reservations/{id}/arrive    → {"ok": true}
 POST /reservations/{id}/checkout  → {"ok": true}
 ```
 
-Authentication: `Authorization: Bearer {token}` on every request.
+Authentication: `Authorization: Bearer {token}`.
 
-Field names are flexible — the provider tries snake_case, camelCase and several aliases for each field. See `providers/custom_endpoint.py` for the full list.
-
----
-
-## Security
-
-- **Credentials stored safely** — API keys live in HA’s config entry store. If you have HA’s storage encryption enabled, they’re encrypted at rest.
-- **No secrets in logs** — the integration never logs API keys or door codes at INFO level.
-- **Network isolation** — the only outbound calls are to your configured PMS endpoint. No telemetry.
-- **Token auth today, OAuth2 ready** — Guesty already uses OAuth2 client credentials with automatic token refresh. The config flow is structured to add authorization-code OAuth2 flows for other providers without breaking existing setups.
+Field names are flexible — see `providers/custom_endpoint.py` for the alias list.
 
 ---
 
 ## Development
 
 ### Quick deploy to local HA
-
-The fastest workflow is a symlink — edits to source files are **immediately** reflected in HA without any copy step:
-
 ```bash
-# One-time setup:
-make symlink   # creates ~/.homeassistant/custom_components/str_ha → ./custom_components/str_ha
-
-# Then restart HA once:
-make restart   # requires 'ha' CLI (Home Assistant OS / Supervised)
-
-# After that, edit → reload integration in HA UI. No copy needed.
-```
-
-For a remote HA instance, edit `.env`:
-```bash
-# .env
-HASS_SSH=user@homeassistant.local
-HASS_CONFIG=/config
-```
-
-Then:
-```bash
-make deploy-ssh        # rsync to remote
-make deploy-ssh-reload # rsync + restart
-make deploy-watch      # auto-rsync on every file save (macOS: fswatch, Linux: inotifywait)
+make symlink   # one-time: link custom_components/str_ha → ~/.homeassistant/custom_components/str_ha
+make restart   # ha CLI restart
 ```
 
 ### Run the tests
-
 ```bash
 pip install -r requirements_test.txt
 make test
 ```
 
-Tests use `aioresponses` to mock HTTP calls — no live PMS credentials needed:
-
-```bash
-pytest tests/ -v
-# tests/providers/test_host_tools.py::TestGetProperties::test_returns_property_list PASSED
-# tests/providers/test_host_tools.py::TestFieldMapping::test_alternate_field_names PASSED
-# tests/test_coordinator.py::TestEventFiring::test_guest_changed_event_fires PASSED
-# ...
-```
-
-### Dev container (VS Code)
-
-Open the repo in VS Code and accept the “Reopen in Container” prompt. The container installs all test dependencies automatically. Run tests with the built-in test runner or `make test` in the integrated terminal.
-
-### Adding a new PMS provider
-
-1. Create `custom_components/str_ha/providers/my_pms.py`
-2. Subclass `STRProvider` from `providers/base.py`
-3. Implement `get_properties()` and `get_property_data()` (and optionally `mark_arrived()` / `mark_checked_out()`)
-4. Add a constant to `const.py` and register it in `providers/__init__.py`
-5. Add a label in `config_flow.py`’s `_PROVIDER_LABELS`
-
-That’s all — the config flow, coordinator, entities, and services all pick it up automatically.
+Tests mock the PMS HTTP layer with `aioresponses` and the lock/store/coordinator with `pytest-homeassistant-custom-component`. No live credentials needed.
 
 ---
 
 ## Roadmap
 
-- [ ] **Webhook receiver** — replace polling with real-time push for supported providers
-- [ ] **OAuth2 config flow** — full authorization-code flow for providers that support it
-- [ ] **Per-property Keymaster slot** — different slot per listing
-- [ ] **Lovelace card** — pre-built guest info card for dashboards
-- [ ] **Cleaning schedule sensor** — expose turnover window between checkout and next check-in
-
----
-
-## Contributing
-
-Pull requests are welcome! Please open an issue first to discuss larger changes.
+- [ ] Webhook receiver (replace polling for supported providers)
+- [ ] Per-entity translation strings for guest/house status values
+- [ ] Lovelace card with current guest + house state at a glance
+- [ ] Cleaner geofence auto-trigger (`cleaning` → `ready`)
 
 ---
 

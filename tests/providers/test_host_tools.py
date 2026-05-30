@@ -74,7 +74,6 @@ class TestGetPropertyData:
         assert data.current_guest.booking_id == "res-001"
         assert data.current_guest.name == "Alice Smith"
         assert data.current_guest.door_code == "1234"
-        assert data.current_guest.email == "alice@example.com"
 
         assert data.next_guest is not None
         assert data.next_guest.booking_id == "res-002"

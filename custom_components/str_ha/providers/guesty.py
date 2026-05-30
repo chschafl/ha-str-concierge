@@ -135,21 +135,12 @@ class GuestyProvider(STRProvider):
             or raw.get("accessCode")
         )
 
-        status_map = {
-            "checked_in": "arrived",
-            "checked_out": "checked_out",
-            "confirmed": "confirmed",
-        }
-
         return Guest(
             booking_id=str(res_id),
             name=name,
-            email=guest_data.get("email"),
-            phone=guest_data.get("phone"),
             checkin=checkin,
             checkout=checkout,
             door_code=door_code,
-            status=status_map.get(raw.get("status", "confirmed"), "confirmed"),
         )
 
     async def get_properties(self) -> list[Property]:

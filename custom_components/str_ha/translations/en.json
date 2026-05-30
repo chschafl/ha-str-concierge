@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Short-Term Rental Manager",
+        "title": "STR Concierge",
         "description": "Choose the property management system to connect to.",
         "data": {
           "provider": "Backend Provider"
@@ -16,18 +16,17 @@
           "base_url": "Base URL (e.g. https://your-server.com/api)"
         }
       },
-      "properties": {
-        "title": "Select Properties",
-        "description": "Choose which properties to sync. Set the polling interval in seconds.",
+      "property": {
+        "title": "Select Property",
+        "description": "Choose the property to manage with this integration. Set the polling interval in seconds.",
         "data": {
-          "property_ids": "Properties",
+          "property_id": "Property",
           "poll_interval": "Polling Interval (seconds)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to the provider. Check your credentials and network.",
-      "no_properties_selected": "Please select at least one property."
+      "cannot_connect": "Cannot connect to the provider. Check your credentials and network."
     },
     "abort": {
       "no_properties": "No properties were found for this account.",
@@ -37,12 +36,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "STR HA Options",
-        "description": "Adjust lock timing offsets. Negative values shift the window inward. Leave Keymaster slot blank to disable automatic sync.",
+        "title": "STR Concierge Options",
+        "description": "Tune arrival window, lock-access window, and how the integration detects that a guest has entered the house.",
         "data": {
-          "checkin_offset_minutes": "Lock enabled N minutes BEFORE check-in (negative = after)",
-          "checkout_offset_minutes": "Lock remains active N minutes AFTER check-out",
-          "keymaster_slot": "Keymaster code slot name (leave blank to disable)"
+          "arrival_window_hours": "Arrival window (hours before check-in)",
+          "lock_minutes_before_checkin": "Lock enabled N minutes BEFORE check-in",
+          "lock_minutes_after_checkout": "Lock remains active N minutes AFTER check-out",
+          "lock_trigger_source": "Lock trigger source",
+          "lock_entity_id": "Lock entity ID (e.g. lock.front_door)",
+          "lock_unlock_states": "States that count as 'unlocked' (comma-separated)",
+          "keymaster_slot": "Keymaster code slot name"
         }
       }
     }

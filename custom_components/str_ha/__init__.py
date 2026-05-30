@@ -1,30 +1,40 @@
-"""Short-Term Rental Manager integration for Home Assistant."""
+"""STR Concierge integration for Home Assistant."""
 
 from __future__ import annotations
 
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
     CONF_API_KEY,
+    CONF_ARRIVAL_WINDOW_HOURS,
     CONF_BASE_URL,
-    CONF_CHECKIN_OFFSET_MINUTES,
-    CONF_CHECKOUT_OFFSET_MINUTES,
     CONF_KEYMASTER_SLOT,
+    CONF_LOCK_ENTITY_ID,
+    CONF_LOCK_MINUTES_AFTER_CHECKOUT,
+    CONF_LOCK_MINUTES_BEFORE_CHECKIN,
+    CONF_LOCK_TRIGGER_SOURCE,
+    CONF_LOCK_UNLOCK_STATES,
     CONF_POLL_INTERVAL,
-    CONF_PROPERTY_IDS,
+    CONF_PROPERTY_ID,
     CONF_PROVIDER,
-    DEFAULT_CHECKIN_OFFSET_MINUTES,
-    DEFAULT_CHECKOUT_OFFSET_MINUTES,
+    DEFAULT_ARRIVAL_WINDOW_HOURS,
+    DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
+    DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
+    DEFAULT_LOCK_UNLOCK_STATES,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     KEYMASTER_CODE_SLOT_PATTERN,
     KEYMASTER_DATE_END_PATTERN,
     KEYMASTER_DATE_START_PATTERN,
     KEYMASTER_ENABLED_PATTERN,
+    KEYMASTER_LOCK_EVENT,
+    LOCK_TRIGGER_ENTITY,
+    LOCK_TRIGGER_KEYMASTER,
     PLATFORMS,
 )
 from .coordinator import STRCoordinator
@@ -34,7 +44,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up STR HA from a config entry."""
+    """Set up STR Concierge from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     provider = create_provider(
@@ -43,25 +53,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         base_url=entry.data.get(CONF_BASE_URL),
     )
 
-    property_ids: list[str] = entry.data[CONF_PROPERTY_IDS]
+    property_id: str = entry.data[CONF_PROPERTY_ID]
     poll_interval: int = entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
 
+    options = entry.options
     coordinator = STRCoordinator(
         hass=hass,
         provider=provider,
-        property_ids=property_ids,
+        property_id=property_id,
         poll_interval=poll_interval,
         entry_id=entry.entry_id,
+        arrival_window_hours=options.get(
+            CONF_ARRIVAL_WINDOW_HOURS, DEFAULT_ARRIVAL_WINDOW_HOURS
+        ),
+        lock_minutes_before_checkin=options.get(
+            CONF_LOCK_MINUTES_BEFORE_CHECKIN, DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN
+        ),
+        lock_minutes_after_checkout=options.get(
+            CONF_LOCK_MINUTES_AFTER_CHECKOUT, DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT
+        ),
     )
+
+    await coordinator.async_load_store()
 
     try:
         await coordinator.async_config_entry_first_refresh()
     except Exception as err:
         raise ConfigEntryNotReady(f"Could not fetch initial data: {err}") from err
 
+    unsubscribers = _install_lock_listener(hass, entry, coordinator)
+
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
-        "property_ids": property_ids,
+        "property_id": property_id,
+        "unsubscribers": unsubscribers,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -75,24 +100,90 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        entry_data = hass.data[DOMAIN].pop(entry.entry_id, None)
+        if entry_data:
+            for unsub in entry_data.get("unsubscribers", []):
+                unsub()
     return unload_ok
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update (e.g. lock offset changes)."""
+    """Reload on options change (lock window, arrival window, trigger source)."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+def _install_lock_listener(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: STRCoordinator
+) -> list:
+    """Install the configured lock-event listener. Returns unsubscriber callables."""
+    options = entry.options
+    source = options.get(CONF_LOCK_TRIGGER_SOURCE, LOCK_TRIGGER_ENTITY)
+    unsubs: list = []
+
+    if source == LOCK_TRIGGER_KEYMASTER:
+        slot = options.get(CONF_KEYMASTER_SLOT, "").strip()
+        if not slot:
+            _LOGGER.warning(
+                "Keymaster lock trigger selected but no slot configured; "
+                "lock-based arrivals disabled"
+            )
+            return unsubs
+
+        @callback
+        def _on_keymaster_event(event: Event) -> None:
+            data = event.data
+            event_slot = (
+                data.get("code_slot_name")
+                or data.get("slot_name")
+                or data.get("slot")
+            )
+            action = (data.get("action_text") or data.get("action") or "").lower()
+            if event_slot != slot:
+                return
+            if action and "unlock" not in action and "keypad" not in action:
+                return
+            hass.async_create_task(coordinator.async_handle_lock_unlocked())
+
+        unsubs.append(hass.bus.async_listen(KEYMASTER_LOCK_EVENT, _on_keymaster_event))
+
+    elif source == LOCK_TRIGGER_ENTITY:
+        entity_id = options.get(CONF_LOCK_ENTITY_ID, "").strip()
+        if not entity_id:
+            _LOGGER.warning(
+                "Entity lock trigger selected but no entity configured; "
+                "lock-based arrivals disabled"
+            )
+            return unsubs
+        unlock_states = options.get(CONF_LOCK_UNLOCK_STATES, DEFAULT_LOCK_UNLOCK_STATES)
+        if isinstance(unlock_states, str):
+            unlock_states = [s.strip() for s in unlock_states.split(",") if s.strip()]
+
+        @callback
+        def _on_state_change(event: Event) -> None:
+            new_state = event.data.get("new_state")
+            old_state = event.data.get("old_state")
+            if new_state is None:
+                return
+            if new_state.state not in unlock_states:
+                return
+            if old_state is not None and old_state.state == new_state.state:
+                return
+            hass.async_create_task(coordinator.async_handle_lock_unlocked())
+
+        unsubs.append(
+            async_track_state_change_event(hass, [entity_id], _on_state_change)
+        )
+
+    return unsubs
+
+
 def _register_services(hass: HomeAssistant) -> None:
-    """Register custom services (idempotent)."""
+    """Register the keymaster-sync service (idempotent)."""
     if hass.services.has_service(DOMAIN, "sync_keymaster"):
         return
 
     async def _sync_keymaster(call: ServiceCall) -> None:
-        """Write current guest door code and lock window to a keymaster slot."""
         entry_id: str = call.data["entry_id"]
-        property_id: str = call.data["property_id"]
         slot: str = call.data["slot"]
 
         entry_data = hass.data.get(DOMAIN, {}).get(entry_id)
@@ -101,53 +192,54 @@ def _register_services(hass: HomeAssistant) -> None:
             return
 
         coordinator: STRCoordinator = entry_data["coordinator"]
-        entry: ConfigEntry = hass.config_entries.async_get_entry(entry_id)
-        pd = coordinator.data.get(property_id) if coordinator.data else None
-        guest = pd.current_guest if pd else None
-
+        state = coordinator.data
+        guest = state.current_guest if state else None
         if not guest:
-            _LOGGER.warning("sync_keymaster: no active guest for property %s", property_id)
+            _LOGGER.warning("sync_keymaster: no active guest")
             return
 
-        checkin_offset = entry.options.get(CONF_CHECKIN_OFFSET_MINUTES, DEFAULT_CHECKIN_OFFSET_MINUTES)
-        checkout_offset = entry.options.get(CONF_CHECKOUT_OFFSET_MINUTES, DEFAULT_CHECKOUT_OFFSET_MINUTES)
-
-        from datetime import timedelta
-        lock_start = guest.checkin - timedelta(minutes=checkin_offset)
-        lock_end = guest.checkout + timedelta(minutes=checkout_offset)
+        lock_start = state.lock_access_start
+        lock_end = state.lock_access_end
 
         if guest.door_code:
-            pin_entity = KEYMASTER_CODE_SLOT_PATTERN.format(slot=slot)
             await hass.services.async_call(
-                "input_text", "set_value",
-                {"entity_id": pin_entity, "value": guest.door_code},
+                "input_text",
+                "set_value",
+                {
+                    "entity_id": KEYMASTER_CODE_SLOT_PATTERN.format(slot=slot),
+                    "value": guest.door_code,
+                },
+            )
+        await hass.services.async_call(
+            "input_boolean",
+            "turn_on",
+            {"entity_id": KEYMASTER_ENABLED_PATTERN.format(slot=slot)},
+        )
+        if lock_start is not None:
+            await hass.services.async_call(
+                "input_datetime",
+                "set_datetime",
+                {
+                    "entity_id": KEYMASTER_DATE_START_PATTERN.format(slot=slot),
+                    "datetime": lock_start.isoformat(),
+                },
+            )
+        if lock_end is not None:
+            await hass.services.async_call(
+                "input_datetime",
+                "set_datetime",
+                {
+                    "entity_id": KEYMASTER_DATE_END_PATTERN.format(slot=slot),
+                    "datetime": lock_end.isoformat(),
+                },
             )
 
-        enabled_entity = KEYMASTER_ENABLED_PATTERN.format(slot=slot)
-        await hass.services.async_call(
-            "input_boolean", "turn_on",
-            {"entity_id": enabled_entity},
-        )
-
-        start_entity = KEYMASTER_DATE_START_PATTERN.format(slot=slot)
-        end_entity = KEYMASTER_DATE_END_PATTERN.format(slot=slot)
-        await hass.services.async_call(
-            "input_datetime", "set_datetime",
-            {"entity_id": start_entity, "datetime": lock_start.isoformat()},
-        )
-        await hass.services.async_call(
-            "input_datetime", "set_datetime",
-            {"entity_id": end_entity, "datetime": lock_end.isoformat()},
-        )
-
         _LOGGER.info(
-            "Keymaster slot %s updated: pin=%s window=%s–%s",
-            slot, guest.door_code, lock_start, lock_end,
+            "Keymaster slot %s synced (pin set=%s window=%s–%s)",
+            slot,
+            bool(guest.door_code),
+            lock_start,
+            lock_end,
         )
 
-    hass.services.async_register(
-        DOMAIN,
-        "sync_keymaster",
-        _sync_keymaster,
-        schema=None,
-    )
+    hass.services.async_register(DOMAIN, "sync_keymaster", _sync_keymaster, schema=None)

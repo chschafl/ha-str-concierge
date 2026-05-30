@@ -1,4 +1,4 @@
-"""Button platform for STR HA — mark arrived / mark checked out."""
+"""Button platform: manual overrides and housekeeping workflow actions."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, HOUSE_CLEANING, HOUSE_READY
 from .coordinator import STRCoordinator
 from .entity import STREntity
 
@@ -23,76 +23,67 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: STRCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    property_ids: list[str] = hass.data[DOMAIN][entry.entry_id]["property_ids"]
-
-    entities = []
-    for prop_id in property_ids:
-        entities.append(MarkArrivedButton(coordinator, prop_id, entry.entry_id))
-        entities.append(MarkCheckedOutButton(coordinator, prop_id, entry.entry_id))
-    async_add_entities(entities)
-
-
-class _ActionButton(STREntity, ButtonEntity):
-    """Base class for action buttons that target the current booking."""
-
-    async def _current_booking_id(self) -> str:
-        pd = self.property_data
-        if pd is None or pd.current_guest is None:
-            raise HomeAssistantError("No active guest booking to act on")
-        return pd.current_guest.booking_id
+    async_add_entities(
+        [
+            MarkArrivedButton(coordinator, entry.entry_id),
+            MarkDepartedButton(coordinator, entry.entry_id),
+            MarkCleaningStartedButton(coordinator, entry.entry_id),
+            MarkReadyButton(coordinator, entry.entry_id),
+        ]
+    )
 
 
-class MarkArrivedButton(_ActionButton):
-    """Button to mark the current guest as arrived."""
+class MarkArrivedButton(STREntity, ButtonEntity):
+    """Manual override when the lock event was missed."""
 
     _attr_name = "Mark Guest Arrived"
     _attr_icon = "mdi:account-check"
 
-    def __init__(
-        self,
-        coordinator: STRCoordinator,
-        property_id: str,
-        entry_id: str,
-    ) -> None:
-        super().__init__(coordinator, property_id, entry_id)
-        self._attr_unique_id = f"{entry_id}_{property_id}_mark_arrived"
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_mark_arrived"
 
     async def async_press(self) -> None:
-        booking_id = await self._current_booking_id()
-        try:
-            await self.coordinator.provider.mark_arrived(booking_id)
-        except NotImplementedError:
-            raise HomeAssistantError(
-                "The configured provider does not support marking guests as arrived"
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Failed to mark guest arrived: {err}") from err
-        await self.coordinator.async_request_refresh()
+        if self.state_data is None or self.state_data.current_guest is None:
+            raise HomeAssistantError("No active booking to mark arrived")
+        await self.coordinator.async_manual_mark_arrived()
 
 
-class MarkCheckedOutButton(_ActionButton):
-    """Button to mark the current guest as checked out."""
+class MarkDepartedButton(STREntity, ButtonEntity):
+    """Manual override to force the current guest into the `departed` state."""
 
-    _attr_name = "Mark Guest Checked Out"
+    _attr_name = "Mark Guest Departed"
     _attr_icon = "mdi:account-arrow-right"
 
-    def __init__(
-        self,
-        coordinator: STRCoordinator,
-        property_id: str,
-        entry_id: str,
-    ) -> None:
-        super().__init__(coordinator, property_id, entry_id)
-        self._attr_unique_id = f"{entry_id}_{property_id}_mark_checked_out"
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_mark_departed"
 
     async def async_press(self) -> None:
-        booking_id = await self._current_booking_id()
-        try:
-            await self.coordinator.provider.mark_checked_out(booking_id)
-        except NotImplementedError:
-            raise HomeAssistantError(
-                "The configured provider does not support marking guests as checked out"
-            )
-        except Exception as err:
-            raise HomeAssistantError(f"Failed to mark guest checked out: {err}") from err
-        await self.coordinator.async_request_refresh()
+        if self.state_data is None or self.state_data.current_guest is None:
+            raise HomeAssistantError("No active booking to mark departed")
+        await self.coordinator.async_manual_mark_departed()
+
+
+class MarkCleaningStartedButton(STREntity, ButtonEntity):
+    _attr_name = "Mark Cleaning Started"
+    _attr_icon = "mdi:broom"
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_mark_cleaning_started"
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_set_house_state(HOUSE_CLEANING)
+
+
+class MarkReadyButton(STREntity, ButtonEntity):
+    _attr_name = "Mark Ready"
+    _attr_icon = "mdi:home-heart"
+
+    def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_mark_ready"
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_set_house_state(HOUSE_READY)

@@ -95,7 +95,6 @@ class HostfullyProvider(STRProvider):
 
     @staticmethod
     def _parse_lead(raw: dict) -> Guest | None:
-        status = raw.get("status", "")
         checkin_str = raw.get("checkInDate") or raw.get("startDate")
         checkout_str = raw.get("checkOutDate") or raw.get("endDate")
         uid = raw.get("uid") or raw.get("id")
@@ -109,20 +108,12 @@ class HostfullyProvider(STRProvider):
         last = raw.get("guestLastName", "")
         name = f"{first} {last}".strip() or raw.get("guestName", "Unknown")
 
-        status_map = {
-            "CHECKED_IN": "arrived",
-            "CHECKED_OUT": "checked_out",
-        }
-
         return Guest(
             booking_id=str(uid),
             name=name,
-            email=raw.get("guestEmail"),
-            phone=raw.get("guestPhone"),
             checkin=checkin,
             checkout=checkout,
             door_code=raw.get("accessCode"),
-            status=status_map.get(status, "confirmed"),
         )
 
     async def get_properties(self) -> list[Property]:
