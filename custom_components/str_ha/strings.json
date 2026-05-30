@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Short-Term Rental Manager",
+        "description": "Choose the property management system to connect to.",
+        "data": {
+          "provider": "Backend Provider"
+        }
+      },
+      "credentials": {
+        "title": "API Credentials",
+        "description": "Enter your API credentials. {api_key_hint}",
+        "data": {
+          "api_key": "API Key / Token",
+          "base_url": "Base URL (e.g. https://your-server.com/api)"
+        }
+      },
+      "properties": {
+        "title": "Select Properties",
+        "description": "Choose which properties to sync. Set the polling interval in seconds.",
+        "data": {
+          "property_ids": "Properties",
+          "poll_interval": "Polling Interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the provider. Check your credentials and network.",
+      "no_properties_selected": "Please select at least one property."
+    },
+    "abort": {
+      "no_properties": "No properties were found for this account.",
+      "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "STR HA Options",
+        "description": "Adjust lock timing offsets. Negative values shift the window inward. Leave Keymaster slot blank to disable automatic sync.",
+        "data": {
+          "checkin_offset_minutes": "Lock enabled N minutes BEFORE check-in (negative = after)",
+          "checkout_offset_minutes": "Lock remains active N minutes AFTER check-out",
+          "keymaster_slot": "Keymaster code slot name (leave blank to disable)"
+        }
+      }
+    }
+  }
+}
