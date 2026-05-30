@@ -1,6 +1,6 @@
 """Constants for the STR Concierge integration."""
 
-DOMAIN = "str_ha"
+DOMAIN = "str_concierge"
 PLATFORMS = ["sensor", "binary_sensor", "button"]
 
 # ── Config entry keys ─────────────────────────────────────────────────

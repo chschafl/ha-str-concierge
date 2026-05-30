@@ -112,7 +112,7 @@ A single device groups all entities for the property.
 
 | Entity | Example |
 |---|---|
-| `Current Guest` | `Alice Smith` |
+| `Guest` | `Alice Smith` |
 | `Door Code` | `1234` (hidden from dashboards by default) |
 | `Guest Status` | `reserved` / `due_in` / `in_house` / `departed` / `vacant` |
 | `House State` | `ready` / `occupied` / `dirty` / `cleaning` |
@@ -142,9 +142,9 @@ A single device groups all entities for the property.
 
 | Event | When it fires |
 |---|---|
-| `str_ha_guest_changed` | Current booking rotated (different `booking_id`) |
-| `str_ha_guest_status_changed` | Guest status transitioned |
-| `str_ha_house_state_changed` | House state transitioned |
+| `str_concierge_guest_changed` | Current booking rotated (different `booking_id`) |
+| `str_concierge_guest_status_changed` | Guest status transitioned |
+| `str_concierge_house_state_changed` | House state transitioned |
 
 All events include `entry_id`, `property_id`, and the previous + new values.
 
@@ -224,7 +224,7 @@ State survives HA restarts. The 10-second departed-dwell timer is in-memory only
 To sync the current guest's PIN and lock-access window into a Keymaster slot:
 
 ```yaml
-service: str_ha.sync_keymaster
+service: str_concierge.sync_keymaster
 data:
   entry_id: "your_config_entry_id"
   slot: "str_guest"
@@ -269,7 +269,7 @@ Field names are flexible — see `providers/custom_endpoint.py` for the alias li
 
 ### Quick deploy to local HA
 ```bash
-make symlink   # one-time: link custom_components/str_ha → ~/.homeassistant/custom_components/str_ha
+make symlink   # one-time: link custom_components/str_concierge → ~/.homeassistant/custom_components/str_concierge
 make restart   # ha CLI restart
 ```
 
@@ -299,7 +299,7 @@ MIT © [chschafl](https://github.com/chschafl)
 <!-- Badges -->
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg
 [hacs-url]: https://github.com/hacs/integration
-[release-badge]: https://img.shields.io/github/v/release/chschafl/str-ha
-[release-url]: https://github.com/chschafl/str-ha/releases
+[release-badge]: https://img.shields.io/github/v/release/chschafl/ha-str-concierge
+[release-url]: https://github.com/chschafl/ha-str-concierge/releases
 [license-badge]: https://img.shields.io/badge/License-MIT-yellow.svg
 [license-url]: LICENSE

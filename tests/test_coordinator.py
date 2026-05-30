@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.str_ha.const import (
+from custom_components.str_concierge.const import (
     DEPARTED_DWELL_SECONDS,
     EVENT_GUEST_CHANGED,
     EVENT_HOUSE_STATE_CHANGED,
@@ -20,8 +20,8 @@ from custom_components.str_ha.const import (
     HOUSE_OCCUPIED,
     HOUSE_READY,
 )
-from custom_components.str_ha.coordinator import STRCoordinator
-from custom_components.str_ha.providers.base import Guest, PropertyData
+from custom_components.str_concierge.coordinator import STRCoordinator
+from custom_components.str_concierge.providers.base import Guest, PropertyData
 
 from .conftest import CURRENT_GUEST, NEXT_GUEST, SAMPLE_PROPERTY_DATA
 
@@ -55,7 +55,7 @@ async def _async_noop():
 
 def _at(now: datetime):
     """Patch _now_utc() inside the coordinator module."""
-    return patch("custom_components.str_ha.coordinator._now_utc", return_value=now)
+    return patch("custom_components.str_concierge.coordinator._now_utc", return_value=now)
 
 
 async def _tick(coord, now: datetime):

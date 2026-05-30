@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from aioresponses import aioresponses
 
-from custom_components.str_ha.providers.custom_endpoint import CustomEndpointProvider
+from custom_components.str_concierge.providers.custom_endpoint import CustomEndpointProvider
 
 BASE = "https://my-api.example.com/api"
 

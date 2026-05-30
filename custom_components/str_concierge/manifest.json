@@ -1,8 +1,8 @@
 {
-  "domain": "str_ha",
-  "name": "Short-Term Rental Manager",
-  "documentation": "https://github.com/chschafl/str-ha",
-  "issue_tracker": "https://github.com/chschafl/str-ha/issues",
+  "domain": "str_concierge",
+  "name": "STR Concierge",
+  "documentation": "https://github.com/chschafl/ha-str-concierge",
+  "issue_tracker": "https://github.com/chschafl/ha-str-concierge/issues",
   "codeowners": ["@chschafl"],
   "requirements": ["aiohttp>=3.9.0"],
   "dependencies": [],

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from custom_components.str_ha.providers.base import Guest, PropertyData, STRProvider
+from custom_components.str_concierge.providers.base import Guest, PropertyData, STRProvider
 
 
 def _guest(booking_id: str, offset_hours_start: int, offset_hours_end: int) -> Guest:

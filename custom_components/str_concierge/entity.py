@@ -25,7 +25,7 @@ class STREntity(CoordinatorEntity[STRCoordinator]):
         state = self.state_data
         name = state.property_name if state else self.coordinator.property_id
         return {
-            "identifiers": {("str_ha", self._entry_id, self.coordinator.property_id)},
+            "identifiers": {("str_concierge", self._entry_id, self.coordinator.property_id)},
             "name": name,
             "manufacturer": "STR Concierge",
             "model": "Short-Term Rental",

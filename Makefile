@@ -1,4 +1,4 @@
-# STR HA — Development helpers
+# STR Concierge — Development helpers
 # ─────────────────────────────────────────────────────────────────────────────
 # Usage:
 #   make deploy           Copy integration to local HA config
@@ -6,7 +6,7 @@
 #   make restart          Restart HA core (requires 'ha' CLI or ssh)
 #   make test             Run unit tests
 #   make lint             Lint + type-check
-#   make logs             Tail HA logs filtered to str_ha
+#   make logs             Tail HA logs filtered to str_concierge
 #
 # Configuration (override via env or .env file):
 #   HASS_CONFIG   Path to HA config dir  (default: ~/.homeassistant)
@@ -16,7 +16,7 @@
 -include .env
 HASS_CONFIG ?= $(HOME)/.homeassistant
 HASS_SSH    ?=
-COMPONENT   := str_ha
+COMPONENT   := str_concierge
 SRC         := custom_components/$(COMPONENT)
 DEST        := $(HASS_CONFIG)/custom_components/$(COMPONENT)
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock
 
-from custom_components.str_ha.coordinator import STRState
-from custom_components.str_ha.sensor import (
+from custom_components.str_concierge.coordinator import STRState
+from custom_components.str_concierge.sensor import (
     GuestNameSensor,
     GuestStatusSensor,
     HouseStateSensor,

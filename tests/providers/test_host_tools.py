@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from aioresponses import aioresponses
 
-from custom_components.str_ha.providers.host_tools import BASE_URL, HostToolsProvider
+from custom_components.str_concierge.providers.host_tools import BASE_URL, HostToolsProvider
 
 
 LISTING_RESPONSE = [

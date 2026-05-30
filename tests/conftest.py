@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.str_ha.const import (
+from custom_components.str_concierge.const import (
     CONF_API_KEY,
     CONF_ARRIVAL_WINDOW_HOURS,
     CONF_LOCK_MINUTES_AFTER_CHECKOUT,
@@ -24,7 +24,7 @@ from custom_components.str_ha.const import (
     PROVIDER_CUSTOM,
     PROVIDER_HOST_TOOLS,
 )
-from custom_components.str_ha.providers.base import Guest, Property, PropertyData
+from custom_components.str_concierge.providers.base import Guest, Property, PropertyData
 
 
 # ── Datetime helpers ──────────────────────────────────────────────────
