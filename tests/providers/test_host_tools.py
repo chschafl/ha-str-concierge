@@ -17,6 +17,11 @@ RESERVATIONS_URL_RE = re.compile(
     rf"{re.escape(BASE_URL)}/getReservations/listing-1/\d{{4}}-\d{{2}}-\d{{2}}/\d{{4}}-\d{{2}}-\d{{2}}"
 )
 
+LISTINGS_RESPONSE = [
+    {"_id": "listing-1", "nickname": "Beach House"},
+    {"_id": "listing-2", "nickname": "Mountain Cabin"},
+]
+
 RESERVATIONS_RESPONSE = [
     {
         "_id": "res-001",
@@ -55,28 +60,39 @@ RESERVATIONS_RESPONSE = [
 
 @pytest.fixture
 def provider():
-    return HostToolsProvider(api_key="test-token", listing_id="listing-1")
+    return HostToolsProvider(api_key="test-token")
 
 
 class TestGetProperties:
-    async def test_returns_configured_listing(self, provider):
-        """get_properties uses a 1-day reservations call as the auth probe."""
+    async def test_returns_listings_from_api(self, provider):
         with aioresponses() as m:
-            m.get(RESERVATIONS_URL_RE, payload=[])
+            m.get(f"{BASE_URL}/getListings", payload=LISTINGS_RESPONSE)
             props = await provider.get_properties()
-        assert len(props) == 1
-        assert props[0].id == "listing-1"
+        assert [p.id for p in props] == ["listing-1", "listing-2"]
+        assert props[0].name == "Beach House"
+
+    async def test_handles_wrapped_envelope(self, provider):
+        with aioresponses() as m:
+            m.get(
+                f"{BASE_URL}/getListings",
+                payload={"listings": LISTINGS_RESPONSE},
+            )
+            props = await provider.get_properties()
+        assert len(props) == 2
+
+    async def test_alternate_listing_field_names(self, provider):
+        alt = [{"id": "alt-1", "title": "Lakeside Loft"}]
+        with aioresponses() as m:
+            m.get(f"{BASE_URL}/getListings", payload=alt)
+            props = await provider.get_properties()
+        assert props[0].id == "alt-1"
+        assert props[0].name == "Lakeside Loft"
 
     async def test_raises_on_http_error(self, provider):
         with aioresponses() as m:
-            m.get(RESERVATIONS_URL_RE, status=401)
+            m.get(f"{BASE_URL}/getListings", status=401)
             with pytest.raises(Exception):
                 await provider.get_properties()
-
-    async def test_raises_without_listing_id(self):
-        bad = HostToolsProvider(api_key="t", listing_id=None)
-        with pytest.raises(ValueError, match="listing ID"):
-            await bad.get_properties()
 
 
 class TestGetPropertyData:
@@ -108,28 +124,18 @@ class TestGetPropertyData:
         assert data.current_guest is None
         assert data.next_guest is None
 
-    async def test_handles_wrapped_envelope(self, provider):
-        with aioresponses() as m:
-            m.get(
-                RESERVATIONS_URL_RE,
-                payload={"reservations": RESERVATIONS_RESPONSE},
-            )
-            data = await provider.get_property_data("listing-1")
-        assert data.current_guest is not None
-        assert data.current_guest.booking_id == "res-001"
-
 
 class TestFieldMapping:
-    async def test_alternate_field_names(self, provider):
+    async def test_alternate_reservation_field_names(self, provider):
         alt_response = [
             {
-                "id": "res-alt",                   # `id` instead of `_id`
-                "firstName": "Carol",              # firstName/lastName instead of guestFirstName/Last
+                "id": "res-alt",                       # `id` instead of `_id`
+                "firstName": "Carol",                  # firstName/lastName instead of guestFirst/Last
                 "lastName": "Lee",
-                "startDate": "2025-06-01T15:00:00Z",  # startDate instead of checkIn
+                "startDate": "2025-06-01T15:00:00Z",   # startDate instead of checkIn
                 "endDate": "2099-12-31T11:00:00Z",
-                "door_code": "9999",               # snake_case
-                "reservationStatus": "accepted",   # reservationStatus instead of status
+                "door_code": "9999",                   # snake_case
+                "reservationStatus": "accepted",       # reservationStatus instead of status
             }
         ]
         with aioresponses() as m:
@@ -162,9 +168,8 @@ class TestAuthHeader:
     async def test_sends_authToken_header_not_bearer(self, provider):
         """Host Tools uses `authToken: <key>`, not Authorization: Bearer."""
         with aioresponses() as m:
-            m.get(RESERVATIONS_URL_RE, payload=[])
-            await provider.get_property_data("listing-1")
-            # Inspect the recorded request.
+            m.get(f"{BASE_URL}/getListings", payload=[])
+            await provider.get_properties()
             (call_args,) = next(iter(m.requests.values()))
             headers = call_args.kwargs.get("headers", {})
             assert headers.get("authToken") == "test-token"

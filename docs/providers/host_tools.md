@@ -23,36 +23,25 @@ https://app.hosttools.com/api
 
 No `/v1` path segment. Overridable via the provider's `base_url` constructor argument (not exposed in the config flow — it's a hook for tests and custom deployments).
 
-## Listing ID is required up front
-
-Host Tools' public API does **not** expose a "list all my listings" endpoint. The user therefore enters their listing ID during the integration's setup flow, alongside the API token. It's persisted in the config entry data and passed to `HostToolsProvider(listing_id=...)`.
-
-Where to find it: the dashboard URL for a listing is shaped like
-
-```
-https://app.hosttools.com/listings/<listing_id>/...
-```
-
-— that opaque ID is what you paste into the config flow.
-
 ## Endpoints used
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/getListings` | All listings accessible with this token |
 | `GET` | `/getReservations/{listingId}/{startDate}/{endDate}` | All reservations whose `[checkIn, checkOut]` overlaps the date window |
 
-Dates in the path are formatted as `YYYY-MM-DD` (UTC). The integration queries a rolling window from "yesterday" through "+180 days" on each poll — enough to surface the still-active checkout from earlier today, the current guest, and the next several months of upcoming bookings without pulling the entire calendar.
+The config flow calls `/getListings` to populate the property picker (which doubles as credential validation — if it returns a 401, the config flow shows `cannot_connect`).
 
-`get_properties()` (called by the config flow to validate credentials) reuses this endpoint with a one-day window — if the call succeeds, the token + listing ID are valid; if not, the config flow shows `cannot_connect`.
+The coordinator calls `/getReservations` every poll. Dates in the path are formatted as `YYYY-MM-DD` (UTC); we query a rolling window from "yesterday" through "+180 days" — enough to surface the still-active checkout from earlier today, the current guest, and the next several months of upcoming bookings without pulling the entire calendar.
 
 ## Response handling
 
-The endpoint returns either:
+Both endpoints return either:
 
 - A raw JSON array: `[ {...}, {...} ]`
-- A wrapped envelope: `{ "reservations": [...] }` or `{ "data": [...] }`
+- A wrapped envelope: `{ "listings": [...] }` / `{ "reservations": [...] }` / `{ "data": [...] }`
 
-Both shapes are unwrapped transparently.
+All shapes are unwrapped transparently.
 
 ## Status filtering
 
@@ -68,7 +57,9 @@ Host Tools includes calendar blocks and cancelled bookings in the same response 
 
 Host Tools is inconsistent across endpoints and integration sources, so each of our fields tries multiple candidate keys in order:
 
-| Our `Guest` field | Host Tools keys (in order) |
+**Reservations (`Guest`)**:
+
+| Our field | Host Tools keys (in order) |
 |---|---|
 | `booking_id` | `_id`, `id`, `confirmationCode`, `confirmation_code` |
 | `name` | `guestFirstName + ' ' + guestLastName`, falling back to `firstName + ' ' + lastName`, falling back to `guestName` or `name` |
@@ -76,7 +67,14 @@ Host Tools is inconsistent across endpoints and integration sources, so each of 
 | `checkout` | `checkOut`, `endDate`, `end_date` |
 | `door_code` | `doorCode`, `door_code` |
 
-If Host Tools changes a key name, the fix is to append the new name to the matching list in `_parse_reservation` — no other code changes required.
+**Listings (`Property`)**:
+
+| Our field | Host Tools keys (in order) |
+|---|---|
+| `id` | `_id`, `id`, `listingId` |
+| `name` | `nickname`, `name`, `title` |
+
+If Host Tools changes a key name, the fix is to append the new name to the matching list in `_parse_reservation` / `_parse_listing` — no other code changes required.
 
 ## Datetime parsing
 

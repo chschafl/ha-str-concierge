@@ -19,18 +19,10 @@ def create_provider(
     provider_type: str,
     api_key: str,
     base_url: str | None = None,
-    **extra,
 ) -> STRProvider:
-    """Instantiate the correct provider for the given type.
-
-    ``extra`` carries provider-specific config that doesn't fit the common
-    (api_key, base_url) shape — e.g. ``host_tools_listing_id`` for Host Tools,
-    which has no listings-list endpoint and so needs the listing ID up front.
-    """
+    """Instantiate the correct provider for the given type."""
     if provider_type == PROVIDER_HOST_TOOLS:
-        return HostToolsProvider(
-            api_key, base_url, listing_id=extra.get("host_tools_listing_id")
-        )
+        return HostToolsProvider(api_key, base_url)
     if provider_type == PROVIDER_CUSTOM:
         if not base_url:
             raise ValueError("Custom endpoint provider requires a base_url")

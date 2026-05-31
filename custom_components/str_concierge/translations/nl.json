@@ -13,8 +13,7 @@
         "description": "Voer je API-inloggegevens in. {api_key_hint}",
         "data": {
           "api_key": "API-sleutel / Token",
-          "base_url": "Basis-URL (bv. https://je-server.com/api)",
-          "host_tools_listing_id": "Host Tools listing-ID"
+          "base_url": "Basis-URL (bv. https://je-server.com/api)"
         }
       },
       "property": {

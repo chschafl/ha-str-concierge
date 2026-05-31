@@ -13,7 +13,6 @@ from .const import (
     CONF_API_KEY,
     CONF_ARRIVAL_WINDOW_HOURS,
     CONF_BASE_URL,
-    CONF_HOST_TOOLS_LISTING_ID,
     CONF_KEYMASTER_SLOT,
     CONF_LOCK_ENTITY_ID,
     CONF_LOCK_MINUTES_AFTER_CHECKOUT,
@@ -64,7 +63,6 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._provider: str | None = None
         self._api_key: str | None = None
         self._base_url: str | None = None
-        self._host_tools_listing_id: str | None = None
         self._available_properties: list[dict] = []
 
     async def async_step_user(
@@ -91,14 +89,10 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._api_key = user_input[CONF_API_KEY]
             self._base_url = user_input.get(CONF_BASE_URL)
-            self._host_tools_listing_id = user_input.get(CONF_HOST_TOOLS_LISTING_ID)
 
             try:
                 provider = create_provider(
-                    self._provider,
-                    self._api_key,
-                    self._base_url,
-                    host_tools_listing_id=self._host_tools_listing_id,
+                    self._provider, self._api_key, self._base_url
                 )
                 props = await provider.get_properties()
             except Exception as err:
@@ -116,22 +110,12 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             schema_dict[vol.Required(CONF_BASE_URL)] = str
         elif self._provider == PROVIDER_GUESTY:
             schema_dict[vol.Optional(CONF_BASE_URL)] = str
-        if self._provider == PROVIDER_HOST_TOOLS:
-            # Host Tools has no listings-list endpoint — collect the listing
-            # ID up front. Find it in the Host Tools dashboard URL, e.g.
-            # https://app.hosttools.com/listings/<listing_id>/...
-            schema_dict[vol.Required(CONF_HOST_TOOLS_LISTING_ID)] = str
 
         description_placeholders = {}
         if self._provider == PROVIDER_GUESTY:
             description_placeholders["api_key_hint"] = "Format: client_id:client_secret"
         elif self._provider == PROVIDER_HOSTFULLY:
             description_placeholders["api_key_hint"] = "Your Hostfully API key"
-        elif self._provider == PROVIDER_HOST_TOOLS:
-            description_placeholders["api_key_hint"] = (
-                "Your Host Tools API token. Also enter your listing ID — "
-                "find it in your dashboard URL after /listings/."
-            )
         else:
             description_placeholders["api_key_hint"] = "Your API token / key"
 
@@ -148,20 +132,17 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            data = {
-                CONF_PROVIDER: self._provider,
-                CONF_API_KEY: self._api_key,
-                CONF_BASE_URL: self._base_url,
-                CONF_PROPERTY_ID: user_input[CONF_PROPERTY_ID],
-                CONF_POLL_INTERVAL: user_input.get(
-                    CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
-                ),
-            }
-            if self._host_tools_listing_id:
-                data[CONF_HOST_TOOLS_LISTING_ID] = self._host_tools_listing_id
             return self.async_create_entry(
                 title=self._entry_title(),
-                data=data,
+                data={
+                    CONF_PROVIDER: self._provider,
+                    CONF_API_KEY: self._api_key,
+                    CONF_BASE_URL: self._base_url,
+                    CONF_PROPERTY_ID: user_input[CONF_PROPERTY_ID],
+                    CONF_POLL_INTERVAL: user_input.get(
+                        CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
+                    ),
+                },
                 options={
                     CONF_ARRIVAL_WINDOW_HOURS: DEFAULT_ARRIVAL_WINDOW_HOURS,
                     CONF_LOCK_MINUTES_BEFORE_CHECKIN: DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,

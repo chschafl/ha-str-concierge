@@ -13,7 +13,6 @@ from .const import (
     CONF_API_KEY,
     CONF_ARRIVAL_WINDOW_HOURS,
     CONF_BASE_URL,
-    CONF_HOST_TOOLS_LISTING_ID,
     CONF_KEYMASTER_SLOT,
     CONF_LOCK_ENTITY_ID,
     CONF_LOCK_MINUTES_AFTER_CHECKOUT,
@@ -52,7 +51,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         provider_type=entry.data[CONF_PROVIDER],
         api_key=entry.data[CONF_API_KEY],
         base_url=entry.data.get(CONF_BASE_URL),
-        host_tools_listing_id=entry.data.get(CONF_HOST_TOOLS_LISTING_ID),
     )
 
     property_id: str = entry.data[CONF_PROPERTY_ID]

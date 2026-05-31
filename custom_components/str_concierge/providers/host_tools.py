@@ -3,12 +3,9 @@
 API base: ``https://app.hosttools.com/api`` (no ``/v1`` path segment)
 Authentication: custom header ``authToken: <token>`` — **not** ``Authorization: Bearer``.
 
-The Host Tools public API does NOT expose a "list my listings" endpoint, so
-the listing ID is collected during the integration's setup flow and stored
-in the config entry. ``get_properties()`` returns a single synthetic
-:class:`Property` so the rest of the integration can be agnostic.
-
 Key endpoints used:
+  GET /getListings
+      → all listings accessible with this token
   GET /getReservations/{listingId}/{startDate}/{endDate}
       → list of reservations whose [checkIn, checkOut] overlaps the window
 
@@ -24,6 +21,10 @@ inconsistent across endpoints and integration sources):
                                            "confirmed", "pending", "inquiry"
                                            and skip "cancelled", "canceled",
                                            "declined", "blocked"
+
+Listing fields:
+    _id / id / listingId                 → property_id
+    nickname / name / title              → property_name
 
 The Host Tools API also has a ``POST /setreservation/{id}`` endpoint for
 updating door codes / guidebook URLs, but does not have an "advance the
@@ -92,14 +93,8 @@ def _ymd(dt: datetime) -> str:
 class HostToolsProvider(STRProvider):
     """Provider backed by the Host Tools public API."""
 
-    def __init__(
-        self,
-        api_key: str,
-        base_url: str | None = None,
-        listing_id: str | None = None,
-    ) -> None:
+    def __init__(self, api_key: str, base_url: str | None = None) -> None:
         super().__init__(api_key, base_url or BASE_URL)
-        self._listing_id = listing_id
 
     # ── HTTP ──────────────────────────────────────────────────────────
 
@@ -124,24 +119,13 @@ class HostToolsProvider(STRProvider):
     # ── STRProvider interface ─────────────────────────────────────────
 
     async def get_properties(self) -> list[Property]:
-        """Return the (single) configured listing.
-
-        Host Tools doesn't expose a listings list endpoint, so the user
-        supplied the listing ID during setup. We use a one-day reservation
-        fetch as the credential-validation probe — any HTTP error here
-        bubbles up and the config flow shows ``cannot_connect``.
-        """
-        if not self._listing_id:
-            raise ValueError(
-                "Host Tools requires a listing ID. Re-add the integration "
-                "and enter your listing ID during setup."
-            )
-        today = datetime.now(timezone.utc)
-        # Probe call validates auth header + listing existence in one shot.
-        await self._get(
-            f"/getReservations/{self._listing_id}/{_ymd(today)}/{_ymd(today + timedelta(days=1))}"
+        data = await self._get("/getListings")
+        items = (
+            data
+            if isinstance(data, list)
+            else data.get("listings", data.get("data", []))
         )
-        return [Property(id=self._listing_id, name=self._listing_id)]
+        return [p for raw in items if (p := self._parse_listing(raw)) is not None]
 
     async def get_property_data(self, property_id: str) -> PropertyData:
         now = datetime.now(timezone.utc)
@@ -168,6 +152,14 @@ class HostToolsProvider(STRProvider):
         )
 
     # ── Parsing ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_listing(raw: dict) -> Property | None:
+        listing_id = _first(raw, ["_id", "id", "listingId"])
+        if not listing_id:
+            return None
+        name = _first(raw, ["nickname", "name", "title"], str(listing_id))
+        return Property(id=str(listing_id), name=str(name))
 
     @staticmethod
     def _parse_reservation(raw: dict) -> Guest | None:
@@ -201,3 +193,4 @@ class HostToolsProvider(STRProvider):
             checkout=checkout,
             door_code=_first(raw, ["doorCode", "door_code"]),
         )
+

@@ -13,8 +13,7 @@
         "description": "Enter your API credentials. {api_key_hint}",
         "data": {
           "api_key": "API Key / Token",
-          "base_url": "Base URL (e.g. https://your-server.com/api)",
-          "host_tools_listing_id": "Host Tools listing ID"
+          "base_url": "Base URL (e.g. https://your-server.com/api)"
         }
       },
       "property": {

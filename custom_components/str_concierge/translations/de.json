@@ -13,8 +13,7 @@
         "description": "Gib deine API-Zugangsdaten ein. {api_key_hint}",
         "data": {
           "api_key": "API-Schlüssel / Token",
-          "base_url": "Basis-URL (z. B. https://dein-server.com/api)",
-          "host_tools_listing_id": "Host Tools Listing-ID"
+          "base_url": "Basis-URL (z. B. https://dein-server.com/api)"
         }
       },
       "property": {
