@@ -383,12 +383,25 @@ Open the repo in VS Code and accept the "Reopen in Container" prompt. The contai
 Before opening a PR:
 
 - [ ] `make lint` passes
-- [ ] `make test` passes (or 4 pre-existing aioresponses URL-matching failures — not your problem)
+- [ ] `make test` passes — **all** tests should be green now; if you see failures on `main`, please open an issue
 - [ ] New provider has at least 4 tests in `tests/providers/test_your_pms.py`
 - [ ] Provider file has a docstring at the top documenting auth, base URL, key endpoints, and any quirks ("rate limited to 1 req/min", "doesn't support mark_arrived", etc.)
 - [ ] If your provider needs a different config-flow field (e.g. an extra `account_id`), add the form schema in `config_flow.py` gated by `if self._provider == YOUR_PROVIDER`
 - [ ] Provider label added to `_PROVIDER_LABELS` and to translations (`strings.json`, `translations/*.json`) if user-facing
 - [ ] No secrets in commits — credentials are config-entry data, never logged at INFO level
+
+### What CI runs on your PR
+
+`.github/workflows/ci.yml` enforces four parallel jobs and **all must pass** before a PR can merge:
+
+| Job | What it runs | Reproduce locally |
+|---|---|---|
+| **Ruff** | `ruff check custom_components/ tests/` | `make lint` |
+| **Pytest** | Full test suite under Python 3.13 with coverage | `make test` |
+| **Hassfest** | HA's official manifest + structure validator | — (CI only) |
+| **HACS validation** | HACS's integration validator (`hacs.json` schema, repo layout) | — (CI only) |
+
+The first two you can — and should — run locally before pushing. The latter two require external action runners; if they fail and you can't tell why, comment on the PR and we'll dig in.
 
 ### A few conventions worth knowing
 
