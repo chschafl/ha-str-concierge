@@ -1,7 +1,9 @@
 # pytest-homeassistant-custom-component drives a deep transitive tree
-# (it depends on `homeassistant` itself). We pin only that one and let pip
-# resolve the rest of the test toolchain to compatible versions.
-pytest-homeassistant-custom-component==0.13.185
+# (it depends on `homeassistant` itself). We pin a recent floor — earlier
+# 0.13.x versions are stricter about aiohttp shutdown-thread cleanup
+# and fail in CI against our test patterns — and let pip resolve the
+# rest of the test toolchain to compatible versions.
+pytest-homeassistant-custom-component>=0.13.300
 
 # Test runner extras — let pip pick versions compatible with pytest-ha.
 pytest
