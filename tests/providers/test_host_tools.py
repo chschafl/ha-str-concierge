@@ -197,6 +197,15 @@ def vienna_tz():
     dt_util.set_default_time_zone(prev)
 
 
+@pytest.fixture
+def la_tz():
+    """Run a test under America/Los_Angeles (PST/PDT — UTC-7 / UTC-8)."""
+    prev = dt_util.DEFAULT_TIME_ZONE
+    dt_util.set_default_time_zone(ZoneInfo("America/Los_Angeles"))
+    yield
+    dt_util.set_default_time_zone(prev)
+
+
 class TestCheckInOutTimes:
     """Host Tools sends date and time-of-day as separate fields. Verify the
     combiner treats the time as HA-local and converts to UTC."""
@@ -356,14 +365,60 @@ class TestCheckInTimeZoneConversion:
         # Date may roll forward, but the time-of-day in UTC is the test point.
         assert data.current_guest.checkin.tzinfo == timezone.utc
 
-    async def test_iso_timestamp_keeps_its_own_offset(self, provider, vienna_tz):
-        """A full ISO string already encodes its timezone — we trust it and
-        do NOT reinterpret as local. UTC `Z` stays UTC even when HA is in Vienna."""
+    async def test_iso_timestamp_with_z_is_treated_as_local(
+        self, provider, vienna_tz
+    ):
+        """Host Tools mis-encodes property-local time as `...Z`. The integration
+        ignores the embedded offset and re-interprets the time portion as local.
+        So 14:00Z under Vienna summer (UTC+2) → 12:00 UTC, NOT 14:00 UTC."""
         response = [
             {
-                "_id": "res-iso-utc",
-                "guestName": "ISO UTC",
-                "checkIn": "2025-06-01T14:00:00Z",   # explicitly UTC
+                "_id": "res-iso-host-tools-lie",
+                "guestName": "ISO Mis-tagged",
+                "checkIn": "2025-06-01T14:00:00Z",
+                "checkOut": "2099-12-31T10:00:00Z",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        # 14:00 Vienna summer = UTC+2 → 12:00 UTC
+        assert data.current_guest.checkin.hour == 12
+        assert data.current_guest.checkin.tzinfo == timezone.utc
+
+    async def test_pst_11am_iso_z_regression(self, provider, la_tz):
+        """Regression: user reported 11 AM PST check-in showing as 4 AM.
+        Host Tools sent it as `T11:00:00Z`; the integration was trusting
+        the `Z` instead of treating 11 as local. Now: 11 AM PDT → 18:00 UTC."""
+        response = [
+            {
+                "_id": "res-kaite",
+                "guestName": "Kaite",
+                "checkIn": "2099-05-31T11:00:00Z",   # forced into the future
+                "checkOut": "2099-06-02T11:00:00Z",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        # Booking is in the future → lands in next_guest. 11 AM PDT (May 31
+        # is DST) = UTC-7 → 18:00 UTC.
+        guest = data.next_guest or data.current_guest
+        assert guest is not None
+        assert guest.checkin.hour == 18
+        assert guest.checkin.tzinfo == timezone.utc
+
+    async def test_iso_timestamp_no_explicit_time_field(self, provider):
+        """When there's no separate time field, the time portion of the
+        ISO string is still extracted and treated as local (HA defaults
+        to UTC in tests, so 14:00 local == 14:00 UTC)."""
+        response = [
+            {
+                "_id": "res-iso-utc-default",
+                "guestName": "ISO Under UTC",
+                "checkIn": "2025-06-01T14:00:00Z",
                 "checkOut": "2099-12-31T10:00:00Z",
                 "status": "accepted",
             }

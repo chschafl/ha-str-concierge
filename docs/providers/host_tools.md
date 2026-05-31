@@ -86,15 +86,17 @@ The time field is parsed in any of these forms:
 
 #### Timezone semantics
 
-The time-of-day field refers to **local wall-clock time at the property** — there's no offset embedded in it, just a number. The provider treats that as Home Assistant's configured timezone (`dt_util.DEFAULT_TIME_ZONE`) and converts to UTC for storage. So if HA is set to `Europe/Vienna` and Host Tools returns `checkIn="2026-06-01"`, `checkInTime=16`:
+Host Tools sends times in **property-local wall-clock**, regardless of how the field is formatted. Critically, **even when `checkIn` looks like a UTC ISO timestamp with a `Z` suffix** (e.g. `"2026-06-01T11:00:00Z"`), the time portion is still local — the `Z` is misleading. The reference TypeScript implementation handles this by always extracting just the time portion and ignoring any embedded offset; this provider does the same.
 
-- Provider interprets that as `2026-06-01 16:00` in Vienna (UTC+2 in summer)
-- Stores it as `2026-06-01 14:00 UTC` internally
-- HA sensors render it in the user's locale and display `16:00` again
+So the rule is uniform: pull the date and the time-of-day out of whatever fields are present, stamp HA's configured timezone (`dt_util.DEFAULT_TIME_ZONE`) on the result, and convert to UTC for storage. Example walk-through, HA set to `America/Los_Angeles` (PDT in summer, UTC-7):
 
-Caveat: this assumes HA's timezone matches the property's. For most short-term-rental setups (HA running on a device at or near the property) that's the case. If you manage a remote property from a different timezone, configure HA to the property's timezone or set the lock-window offsets to compensate.
+| Host Tools sends | Interpreted as | Stored as | HA renders to user |
+|---|---|---|---|
+| `checkIn: "2026-06-01"`, `checkInTime: 11` | `2026-06-01 11:00` local | `2026-06-01 18:00 UTC` | `11:00 AM` |
+| `checkIn: "2026-06-01T11:00:00Z"` (no explicit time field) | `2026-06-01 11:00` local (Z ignored) | `2026-06-01 18:00 UTC` | `11:00 AM` |
+| `checkIn: "2026-06-01"`, no time at all | `2026-06-01 00:00` local | `2026-06-01 07:00 UTC` | `12:00 AM` |
 
-If the date field is a **full ISO timestamp** (e.g. `"2026-06-01T16:00:00Z"`) instead of date-only, we trust its embedded offset and don't reinterpret it. If neither field carries a time, the booking defaults to local midnight and converts to UTC accordingly.
+Caveat: this assumes HA's configured timezone matches the property's timezone. For most short-term-rental setups (HA running on a device at or near the property) that's the case. If you manage a remote property from a different timezone, configure HA to the property's timezone — **not** your own — or set the lock-window offsets to compensate.
 
 ### Door code
 

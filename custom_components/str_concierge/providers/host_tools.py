@@ -153,59 +153,50 @@ def _parse_time_of_day(value) -> tuple[int, int] | None:
     return None
 
 
-_DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-
 def _combine_date_and_time(date_value, time_value) -> datetime | None:
-    """Combine a date (or ISO datetime) with a separate time-of-day field.
+    """Combine a Host Tools date + time-of-day field into a UTC datetime.
 
-    Host Tools sends ``checkIn`` as a date-only string (``"2026-06-01"``) and
-    ``checkInTime`` separately as ``16``, ``"16:00"``, ``"4 PM"``, etc. The
-    time-of-day value refers to **local wall-clock time at the property** —
-    in practice, HA's configured timezone. We attach that local timezone
-    when combining, then convert the result to UTC for downstream storage.
+    **Host Tools sends times in property-local wall-clock — even when the
+    field is formatted as ISO with a ``Z`` suffix.** That suffix is
+    misleading. Tested empirically: a guest with a stated 11:00 AM PST
+    check-in arrives over the wire as ``"…T11:00:00Z"`` (or just
+    ``checkIn`` date-only with ``checkInTime: 11``). Either way the ``11``
+    is local clock time, not UTC.
 
-    Branches:
-
-    * ``date_value`` is just a date (``YYYY-MM-DD``)
-        → build a naive datetime, attach HA's local timezone, convert to UTC.
-        → if no time field is present, default to midnight local time.
-    * ``date_value`` is a full ISO timestamp with embedded time/offset
-        → trust the embedded offset; if a separate time field is present,
-          override the hour/minute portion in that same zone (Host Tools
-          rarely sends both, but we handle it for symmetry).
+    The reference TypeScript implementation handles this by always
+    extracting just the date + time-of-day portions and discarding any
+    offset. We do the same: parse out the date, pick a time of day
+    (explicit time field wins, then the HH:MM in the ISO string, else
+    midnight), stamp HA's configured timezone, and convert to UTC.
     """
     raw = "" if date_value is None else str(date_value).strip()
     if not raw:
         return None
 
-    time_of_day = _parse_time_of_day(time_value)
-
-    if _DATE_ONLY_RE.match(raw):
-        try:
-            naive = datetime.strptime(raw, "%Y-%m-%d")
-        except ValueError:
-            return None
-        h, m = time_of_day if time_of_day is not None else (0, 0)
-        # dt_util.DEFAULT_TIME_ZONE follows HA's user-configured timezone.
-        tz = dt_util.DEFAULT_TIME_ZONE
-        local = naive.replace(
-            hour=h, minute=m, second=0, microsecond=0, tzinfo=tz,
-        )
-        result = local.astimezone(timezone.utc)
-        _LOGGER.debug(
-            "combine date+time: date=%r time=%r tz=%s → local=%s → utc=%s",
-            raw, time_value, tz, local.isoformat(), result.isoformat(),
-        )
-        return result
-
-    base = _parse_dt(raw)
-    if base is None:
+    date_match = re.match(r"(\d{4})-(\d{2})-(\d{2})", raw)
+    if not date_match:
         return None
-    if time_of_day is not None:
-        h, m = time_of_day
-        base = base.replace(hour=h, minute=m, second=0, microsecond=0)
-    return base
+    year, month, day = (int(g) for g in date_match.groups())
+
+    time_of_day = _parse_time_of_day(time_value)
+    if time_of_day is None:
+        # No explicit time field — try the HH:MM embedded in the ISO date,
+        # but treat it as local regardless of any trailing offset.
+        iso_time = re.search(r"T(\d{2}):(\d{2})", raw)
+        if iso_time:
+            time_of_day = (int(iso_time.group(1)), int(iso_time.group(2)))
+    if time_of_day is None:
+        time_of_day = (0, 0)
+
+    h, m = time_of_day
+    tz = dt_util.DEFAULT_TIME_ZONE
+    local = datetime(year, month, day, h, m, tzinfo=tz)
+    result = local.astimezone(timezone.utc)
+    _LOGGER.debug(
+        "combine date+time: raw_date=%r raw_time=%r tz=%s → local=%s → utc=%s",
+        raw, time_value, tz, local.isoformat(), result.isoformat(),
+    )
+    return result
 
 
 class HostToolsProvider(STRProvider):
