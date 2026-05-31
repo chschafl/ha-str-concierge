@@ -21,6 +21,7 @@ CONF_KEYMASTER_SLOT = "keymaster_slot"
 
 LOCK_TRIGGER_KEYMASTER = "keymaster"
 LOCK_TRIGGER_ENTITY = "entity"
+LOCK_TRIGGER_DISABLED = "disabled"
 
 # ── Provider identifiers ──────────────────────────────────────────────
 PROVIDER_HOST_TOOLS = "host_tools"

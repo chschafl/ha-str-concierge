@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    LOCK_TRIGGER_DISABLED,
     LOCK_TRIGGER_ENTITY,
     LOCK_TRIGGER_KEYMASTER,
     PROVIDER_CUSTOM,
@@ -47,8 +48,9 @@ _PROVIDER_LABELS = {
 }
 
 _LOCK_TRIGGER_LABELS = {
-    LOCK_TRIGGER_KEYMASTER: "Keymaster slot event",
     LOCK_TRIGGER_ENTITY: "Lock / sensor entity state change",
+    LOCK_TRIGGER_KEYMASTER: "Keymaster slot event",
+    LOCK_TRIGGER_DISABLED: "Disabled — manual buttons only",
 }
 
 _NEEDS_BASE_URL = {PROVIDER_CUSTOM}

@@ -99,6 +99,17 @@ def _parse_iso(value: str | None) -> datetime | None:
         return None
 
 
+def _booking_summary(guest: Guest | None) -> str:
+    """One-line representation of a booking for log lines."""
+    if guest is None:
+        return "None"
+    return (
+        f"{guest.name!r} (id={guest.booking_id}, "
+        f"checkin={guest.checkin.isoformat()}, "
+        f"checkout={guest.checkout.isoformat()})"
+    )
+
+
 class STRCoordinator(DataUpdateCoordinator[STRState]):
     """Single-property coordinator: polls PMS, merges with local state."""
 
@@ -255,6 +266,12 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         except Exception as err:
             raise UpdateFailed(f"Error fetching property {self._property_id}: {err}") from err
 
+        _LOGGER.debug(
+            "Poll: provider returned current=%s, next=%s",
+            _booking_summary(pd.current_guest),
+            _booking_summary(pd.next_guest),
+        )
+
         # If PMS still surfaces the dismissed booking as current, skip past it
         # by promoting the next booking into the current slot.
         pd = self._apply_dismissal(pd)
@@ -274,6 +291,18 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
             await self._persist()
 
         state = self._derive_state(pd)
+
+        _LOGGER.debug(
+            "Poll: derived status=%s, house=%s, current=%s, next=%s, "
+            "lock_window=[%s .. %s], entered_at=%s",
+            state.guest_status,
+            state.house_state,
+            _booking_summary(state.current_guest),
+            _booking_summary(state.next_guest),
+            state.lock_access_start.isoformat() if state.lock_access_start else None,
+            state.lock_access_end.isoformat() if state.lock_access_end else None,
+            state.entered_at.isoformat() if state.entered_at else None,
+        )
 
         # Schedule departed-dwell when the lock window has expired post-arrival.
         if state.guest_status == GUEST_DEPARTED and self._dwell_cancel is None:
@@ -342,6 +371,11 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         current_id = state.current_guest.booking_id if state.current_guest else None
 
         if current_id != self._previous_guest_id:
+            _LOGGER.info(
+                "Guest changed: %s → %s",
+                self._previous_guest_id,
+                _booking_summary(state.current_guest),
+            )
             self.hass.bus.async_fire(
                 EVENT_GUEST_CHANGED,
                 {
@@ -356,6 +390,11 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
             self._previous_guest_id = current_id
 
         if state.guest_status != self._previous_status:
+            _LOGGER.info(
+                "Guest status: %s → %s",
+                self._previous_status,
+                state.guest_status,
+            )
             self.hass.bus.async_fire(
                 EVENT_GUEST_STATUS_CHANGED,
                 {
@@ -368,6 +407,11 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
             self._previous_status = state.guest_status
 
         if state.house_state != self._previous_house_state:
+            _LOGGER.info(
+                "House state: %s → %s",
+                self._previous_house_state,
+                state.house_state,
+            )
             self.hass.bus.async_fire(
                 EVENT_HOUSE_STATE_CHANGED,
                 {

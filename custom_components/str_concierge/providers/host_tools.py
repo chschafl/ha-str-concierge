@@ -129,9 +129,9 @@ class HostToolsProvider(STRProvider):
 
     async def get_property_data(self, property_id: str) -> PropertyData:
         now = datetime.now(timezone.utc)
-        data = await self._get(
-            f"/getReservations/{property_id}/{_ymd(now - LOOKBACK)}/{_ymd(now + LOOKAHEAD)}"
-        )
+        start = _ymd(now - LOOKBACK)
+        end = _ymd(now + LOOKAHEAD)
+        data = await self._get(f"/getReservations/{property_id}/{start}/{end}")
 
         items = (
             data
@@ -140,6 +140,17 @@ class HostToolsProvider(STRProvider):
         )
 
         guests = [g for raw in items if (g := self._parse_reservation(raw)) is not None]
+        skipped = len(items) - len(guests)
+        _LOGGER.info(
+            "Host Tools /getReservations[%s, %s..%s]: %d returned, %d kept, %d filtered",
+            property_id,
+            start,
+            end,
+            len(items),
+            len(guests),
+            skipped,
+        )
+
         current, next_guest = (
             self._pick_current_and_next(guests) if guests else (None, None)
         )
@@ -167,6 +178,11 @@ class HostToolsProvider(STRProvider):
             _first(raw, ["status", "reservationStatus"], "accepted")
         ).lower().strip()
         if status in SKIP_STATUSES or status not in ACTIVE_STATUSES:
+            _LOGGER.debug(
+                "Skipping reservation %s (status=%s)",
+                _first(raw, ["_id", "id", "confirmationCode"]),
+                status,
+            )
             return None
 
         booking_id = _first(

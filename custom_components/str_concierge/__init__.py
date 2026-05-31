@@ -33,6 +33,7 @@ from .const import (
     KEYMASTER_DATE_START_PATTERN,
     KEYMASTER_ENABLED_PATTERN,
     KEYMASTER_LOCK_EVENT,
+    LOCK_TRIGGER_DISABLED,
     LOCK_TRIGGER_ENTITY,
     LOCK_TRIGGER_KEYMASTER,
     PLATFORMS,
@@ -119,6 +120,12 @@ def _install_lock_listener(
     options = entry.options
     source = options.get(CONF_LOCK_TRIGGER_SOURCE, LOCK_TRIGGER_ENTITY)
     unsubs: list = []
+
+    if source == LOCK_TRIGGER_DISABLED:
+        _LOGGER.debug(
+            "Lock trigger disabled — arrival latching only via manual buttons"
+        )
+        return unsubs
 
     if source == LOCK_TRIGGER_KEYMASTER:
         slot = options.get(CONF_KEYMASTER_SLOT, "").strip()
