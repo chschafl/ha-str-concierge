@@ -5,13 +5,13 @@ Expects a REST API at a user-supplied base URL with these endpoints:
   GET  {base_url}/properties
        → [{"id": "...", "name": "..."}]
 
-  GET  {base_url}/reservations?propertyId={id}
-       → [{"id": "...", "guestName": "...", "guestEmail": "...",
-            "guestPhone": "...", "checkIn": "ISO-8601",
-            "checkOut": "ISO-8601", "doorCode": "...", "status": "..."}]
+  GET  {base_url}/properties/{propertyId}/reservations
+       → [{"id": "...", "guestName": "...",
+            "checkIn": "ISO-8601", "checkOut": "ISO-8601",
+            "doorCode": "...", "status": "..."}]
 
-  POST {base_url}/reservations/{id}/arrive   → {"ok": true}
-  POST {base_url}/reservations/{id}/checkout → {"ok": true}
+  POST {base_url}/properties/{propertyId}/reservations/{reservationId}/arrive    → {"ok": true}
+  POST {base_url}/properties/{propertyId}/reservations/{reservationId}/checkout  → {"ok": true}
 
 Authentication: Bearer token via Authorization header.
 """
@@ -76,6 +76,12 @@ class CustomEndpointProvider(STRProvider):
     ) -> None:
         super().__init__(api_key, base_url.rstrip("/"))
         self._field_map = {**DEFAULT_FIELD_MAP, **(field_map or {})}
+        # The reservations endpoints are nested under /properties/{id}. We
+        # stash the property_id from the first get_property_data() call so
+        # mark_arrived / mark_checked_out (which only receive the booking_id)
+        # can construct the correct URL. One property per config entry, so
+        # caching this is safe.
+        self._property_id: str | None = None
 
     def _headers(self) -> dict:
         return {
@@ -131,7 +137,8 @@ class CustomEndpointProvider(STRProvider):
         return [p for raw in items if (p := self._parse_property(raw))]
 
     async def get_property_data(self, property_id: str) -> PropertyData:
-        data = await self._get("/reservations", params={"propertyId": property_id})
+        self._property_id = property_id
+        data = await self._get(f"/properties/{property_id}/reservations")
         items = data if isinstance(data, list) else data.get("reservations", data.get("data", []))
         guests = [g for raw in items if (g := self._parse_reservation(raw))]
         current, next_guest = self._pick_current_and_next(guests) if guests else (None, None)
@@ -143,9 +150,22 @@ class CustomEndpointProvider(STRProvider):
         )
 
     async def mark_arrived(self, booking_id: str) -> bool:
-        await self._post(f"/reservations/{booking_id}/arrive")
+        if self._property_id is None:
+            raise RuntimeError(
+                "mark_arrived called before get_property_data — no property_id known"
+            )
+        await self._post(
+            f"/properties/{self._property_id}/reservations/{booking_id}/arrive"
+        )
         return True
 
     async def mark_checked_out(self, booking_id: str) -> bool:
-        await self._post(f"/reservations/{booking_id}/checkout")
+        if self._property_id is None:
+            raise RuntimeError(
+                "mark_checked_out called before get_property_data — no property_id known"
+            )
+        await self._post(
+            f"/properties/{self._property_id}/reservations/{booking_id}/checkout"
+        )
         return True
+
