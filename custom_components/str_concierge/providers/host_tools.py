@@ -44,7 +44,7 @@ from __future__ import annotations
 import logging
 import math
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import aiohttp
 from homeassistant.util import dt as dt_util
@@ -83,7 +83,7 @@ def _parse_dt(value: str | None) -> datetime | None:
         try:
             dt = datetime.strptime(value, fmt)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except ValueError:
             continue
@@ -191,7 +191,7 @@ def _combine_date_and_time(date_value, time_value) -> datetime | None:
     h, m = time_of_day
     tz = dt_util.DEFAULT_TIME_ZONE
     local = datetime(year, month, day, h, m, tzinfo=tz)
-    result = local.astimezone(timezone.utc)
+    result = local.astimezone(UTC)
     _LOGGER.debug(
         "combine date+time: raw_date=%r raw_time=%r tz=%s → local=%s → utc=%s",
         raw, time_value, tz, local.isoformat(), result.isoformat(),
@@ -243,7 +243,7 @@ class HostToolsProvider(STRProvider):
         return [p for raw in items if (p := self._parse_listing(raw)) is not None]
 
     async def get_property_data(self, property_id: str) -> PropertyData:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start = _ymd(now - LOOKBACK)
         end = _ymd(now + self._lookahead)
         data = await self._get(f"/getReservations/{property_id}/{start}/{end}")

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import aiohttp
 
@@ -42,7 +42,7 @@ def _parse_dt(value: str | None) -> datetime | None:
         try:
             dt = datetime.strptime(value, fmt)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except ValueError:
             continue
@@ -162,7 +162,7 @@ class GuestyProvider(STRProvider):
         ]
 
     async def get_property_data(self, property_id: str) -> PropertyData:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         from_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         to_date = (now + self._lookahead).strftime("%Y-%m-%d")
 

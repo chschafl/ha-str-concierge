@@ -3,7 +3,7 @@ from __future__ import annotations
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -28,11 +28,10 @@ from custom_components.str_concierge.const import (
 )
 from custom_components.str_concierge.providers.base import Guest, Property, PropertyData
 
-
 # ── Datetime helpers ──────────────────────────────────────────────────
 
 def dt(iso: str) -> datetime:
-    return datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(iso).replace(tzinfo=UTC)
 
 
 # ── Sample data ───────────────────────────────────────────────────────
