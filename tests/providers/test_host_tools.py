@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import re
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 from aioresponses import aioresponses
+from homeassistant.util import dt as dt_util
 
 from custom_components.str_concierge.providers.host_tools import (
     BASE_URL,
@@ -176,11 +179,29 @@ class TestAuthHeader:
             assert "Authorization" not in headers
 
 
+@pytest.fixture
+def utc_tz():
+    """Ensure HA's default timezone is UTC for tests that don't care about TZ."""
+    prev = dt_util.DEFAULT_TIME_ZONE
+    dt_util.set_default_time_zone(dt_util.UTC)
+    yield
+    dt_util.set_default_time_zone(prev)
+
+
+@pytest.fixture
+def vienna_tz():
+    """Run a test under Europe/Vienna (UTC+1 winter / UTC+2 summer DST)."""
+    prev = dt_util.DEFAULT_TIME_ZONE
+    dt_util.set_default_time_zone(ZoneInfo("Europe/Vienna"))
+    yield
+    dt_util.set_default_time_zone(prev)
+
+
 class TestCheckInOutTimes:
     """Host Tools sends date and time-of-day as separate fields. Verify the
-    combiner respects the explicit time field over the date's time."""
+    combiner treats the time as HA-local and converts to UTC."""
 
-    async def test_combines_date_with_numeric_hour(self, provider):
+    async def test_combines_date_with_numeric_hour(self, provider, utc_tz):
         response = [
             {
                 "_id": "res-numeric",
@@ -195,11 +216,12 @@ class TestCheckInOutTimes:
         with aioresponses() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
+        # HA tz is UTC, so 16:00 local == 16:00 UTC.
         assert data.current_guest.checkin.hour == 16
         assert data.current_guest.checkin.minute == 0
         assert data.current_guest.checkout.hour == 11
 
-    async def test_combines_date_with_string_hhmm(self, provider):
+    async def test_combines_date_with_string_hhmm(self, provider, utc_tz):
         response = [
             {
                 "_id": "res-hhmm",
@@ -217,7 +239,7 @@ class TestCheckInOutTimes:
         assert data.current_guest.checkin.hour == 15
         assert data.current_guest.checkin.minute == 30
 
-    async def test_combines_date_with_12_hour_string(self, provider):
+    async def test_combines_date_with_12_hour_string(self, provider, utc_tz):
         response = [
             {
                 "_id": "res-12h",
@@ -235,7 +257,7 @@ class TestCheckInOutTimes:
         assert data.current_guest.checkin.hour == 16
         assert data.current_guest.checkout.hour == 11
 
-    async def test_combines_fractional_numeric_hour(self, provider):
+    async def test_combines_fractional_numeric_hour(self, provider, utc_tz):
         response = [
             {
                 "_id": "res-frac",
@@ -253,7 +275,7 @@ class TestCheckInOutTimes:
         assert (data.current_guest.checkin.hour, data.current_guest.checkin.minute) == (15, 30)
         assert (data.current_guest.checkout.hour, data.current_guest.checkout.minute) == (10, 15)
 
-    async def test_falls_back_to_date_time_when_no_explicit_time(self, provider):
+    async def test_falls_back_to_date_time_when_no_explicit_time(self, provider, utc_tz):
         """If only a full ISO datetime is sent (no separate time field),
         use the time embedded in the date string."""
         response = [
@@ -270,10 +292,9 @@ class TestCheckInOutTimes:
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 14
 
-    async def test_date_only_without_time_defaults_to_midnight(self, provider):
-        """Date-only without an explicit time field falls through to midnight,
-        which is correct for the underlying parser. (Hosts who care will
-        configure their lock window to compensate.)"""
+    async def test_date_only_without_time_defaults_to_midnight(self, provider, utc_tz):
+        """Date-only without an explicit time field falls through to local
+        midnight (= UTC midnight under the utc_tz fixture)."""
         response = [
             {
                 "_id": "res-midnight",
@@ -287,6 +308,70 @@ class TestCheckInOutTimes:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 0
+
+
+class TestCheckInTimeZoneConversion:
+    """When Host Tools sends a date-only field + a numeric time, the time
+    refers to local wall-clock at the property (= HA's configured tz). We
+    must convert that to UTC for storage so coordinator math is consistent."""
+
+    async def test_vienna_summer_4pm_local_is_14utc(self, provider, vienna_tz):
+        """June 1 is DST in Vienna (UTC+2), so 16:00 local → 14:00 UTC."""
+        response = [
+            {
+                "_id": "res-tz-summer",
+                "guestName": "Vienna Summer",
+                "checkIn": "2025-06-01",
+                "checkInTime": 16,
+                "checkOut": "2099-12-31",
+                "checkOutTime": 11,
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        # 16:00 Vienna summer = UTC+2 = 14:00 UTC
+        assert data.current_guest.checkin.hour == 14
+        assert data.current_guest.checkin.minute == 0
+        assert data.current_guest.checkin.tzinfo == timezone.utc
+
+    async def test_vienna_winter_4pm_local_is_15utc(self, provider, vienna_tz):
+        """January is standard time in Vienna (UTC+1), so 16:00 local → 15:00 UTC."""
+        response = [
+            {
+                "_id": "res-tz-winter",
+                "guestName": "Vienna Winter",
+                "checkIn": "2025-01-15",
+                "checkInTime": 16,
+                "checkOut": "2099-12-31",
+                "checkOutTime": 11,
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 15
+        # Date may roll forward, but the time-of-day in UTC is the test point.
+        assert data.current_guest.checkin.tzinfo == timezone.utc
+
+    async def test_iso_timestamp_keeps_its_own_offset(self, provider, vienna_tz):
+        """A full ISO string already encodes its timezone — we trust it and
+        do NOT reinterpret as local. UTC `Z` stays UTC even when HA is in Vienna."""
+        response = [
+            {
+                "_id": "res-iso-utc",
+                "guestName": "ISO UTC",
+                "checkIn": "2025-06-01T14:00:00Z",   # explicitly UTC
+                "checkOut": "2099-12-31T10:00:00Z",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 14
 
 
 class TestDoorCode:

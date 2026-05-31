@@ -84,7 +84,17 @@ The time field is parsed in any of these forms:
 | `"4:00 PM"` / `"4 PM"` | `16:00` |
 | ISO timestamp containing `T16:00` | `16:00` |
 
-If the explicit time field is missing but the date field is a full ISO timestamp, the time portion of the ISO string wins. If neither has a time, the booking defaults to midnight UTC and the host is expected to compensate via the lock-window offsets.
+#### Timezone semantics
+
+The time-of-day field refers to **local wall-clock time at the property** — there's no offset embedded in it, just a number. The provider treats that as Home Assistant's configured timezone (`dt_util.DEFAULT_TIME_ZONE`) and converts to UTC for storage. So if HA is set to `Europe/Vienna` and Host Tools returns `checkIn="2026-06-01"`, `checkInTime=16`:
+
+- Provider interprets that as `2026-06-01 16:00` in Vienna (UTC+2 in summer)
+- Stores it as `2026-06-01 14:00 UTC` internally
+- HA sensors render it in the user's locale and display `16:00` again
+
+Caveat: this assumes HA's timezone matches the property's. For most short-term-rental setups (HA running on a device at or near the property) that's the case. If you manage a remote property from a different timezone, configure HA to the property's timezone or set the lock-window offsets to compensate.
+
+If the date field is a **full ISO timestamp** (e.g. `"2026-06-01T16:00:00Z"`) instead of date-only, we trust its embedded offset and don't reinterpret it. If neither field carries a time, the booking defaults to local midnight and converts to UTC accordingly.
 
 ### Door code
 

@@ -47,6 +47,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
+from homeassistant.util import dt as dt_util
 
 from .base import Guest, Property, PropertyData, STRProvider
 
@@ -152,23 +153,54 @@ def _parse_time_of_day(value) -> tuple[int, int] | None:
     return None
 
 
+_DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _combine_date_and_time(date_value, time_value) -> datetime | None:
     """Combine a date (or ISO datetime) with a separate time-of-day field.
 
-    Host Tools sends ``checkIn`` as just the date (``2026-06-01``) and
-    ``checkInTime`` separately as ``16`` or ``"16:00"``. We parse both,
-    then overwrite the date's time component with the explicit time
-    field when present. If the date already had a non-midnight time and
-    no explicit time field exists, the date's time wins.
+    Host Tools sends ``checkIn`` as a date-only string (``"2026-06-01"``) and
+    ``checkInTime`` separately as ``16``, ``"16:00"``, ``"4 PM"``, etc. The
+    time-of-day value refers to **local wall-clock time at the property** —
+    in practice, HA's configured timezone. We attach that local timezone
+    when combining, then convert the result to UTC for downstream storage.
+
+    Branches:
+
+    * ``date_value`` is just a date (``YYYY-MM-DD``)
+        → build a naive datetime, attach HA's local timezone, convert to UTC.
+        → if no time field is present, default to midnight local time.
+    * ``date_value`` is a full ISO timestamp with embedded time/offset
+        → trust the embedded offset; if a separate time field is present,
+          override the hour/minute portion in that same zone (Host Tools
+          rarely sends both, but we handle it for symmetry).
     """
-    base = _parse_dt(date_value)
+    raw = "" if date_value is None else str(date_value).strip()
+    if not raw:
+        return None
+
+    time_of_day = _parse_time_of_day(time_value)
+
+    if _DATE_ONLY_RE.match(raw):
+        try:
+            naive = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            return None
+        h, m = time_of_day if time_of_day is not None else (0, 0)
+        # dt_util.DEFAULT_TIME_ZONE follows HA's user-configured timezone.
+        local = naive.replace(
+            hour=h, minute=m, second=0, microsecond=0,
+            tzinfo=dt_util.DEFAULT_TIME_ZONE,
+        )
+        return local.astimezone(timezone.utc)
+
+    base = _parse_dt(raw)
     if base is None:
         return None
-    time_of_day = _parse_time_of_day(time_value)
-    if time_of_day is None:
-        return base
-    h, m = time_of_day
-    return base.replace(hour=h, minute=m, second=0, microsecond=0)
+    if time_of_day is not None:
+        h, m = time_of_day
+        base = base.replace(hour=h, minute=m, second=0, microsecond=0)
+    return base
 
 
 class HostToolsProvider(STRProvider):
