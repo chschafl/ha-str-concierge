@@ -48,10 +48,10 @@ _LOGGER = logging.getLogger(__name__)
 BASE_URL = "https://app.hosttools.com/api"
 
 # Reservation look-ahead. Captures a still-active checkout from earlier today
-# plus everything booked for the next ~6 months — enough for `current` and
+# plus everything booked for the next ~3 months — enough for `current` and
 # `next` derivation without pulling the whole calendar.
 LOOKBACK = timedelta(days=1)
-LOOKAHEAD = timedelta(days=180)
+LOOKAHEAD = timedelta(days=90)
 
 ACTIVE_STATUSES = {"accepted", "confirmed", "pending", "inquiry"}
 SKIP_STATUSES = {"cancelled", "canceled", "declined", "blocked"}
@@ -174,9 +174,11 @@ class HostToolsProvider(STRProvider):
 
     @staticmethod
     def _parse_reservation(raw: dict) -> Guest | None:
-        status = str(
-            _first(raw, ["status", "reservationStatus"], "accepted")
-        ).lower().strip()
+        status = (
+            str(_first(raw, ["status", "reservationStatus"], "accepted"))
+            .lower()
+            .strip()
+        )
         if status in SKIP_STATUSES or status not in ACTIVE_STATUSES:
             _LOGGER.debug(
                 "Skipping reservation %s (status=%s)",
@@ -185,9 +187,7 @@ class HostToolsProvider(STRProvider):
             )
             return None
 
-        booking_id = _first(
-            raw, ["_id", "id", "confirmationCode", "confirmation_code"]
-        )
+        booking_id = _first(raw, ["_id", "id", "confirmationCode", "confirmation_code"])
         checkin = _parse_dt(_first(raw, ["checkIn", "startDate", "start_date"]))
         checkout = _parse_dt(_first(raw, ["checkOut", "endDate", "end_date"]))
 
@@ -197,9 +197,8 @@ class HostToolsProvider(STRProvider):
 
         first = _first(raw, ["guestFirstName", "firstName"], "")
         last = _first(raw, ["guestLastName", "lastName"], "")
-        name = (
-            f"{first} {last}".strip()
-            or _first(raw, ["guestName", "name"], "Unknown")
+        name = f"{first} {last}".strip() or _first(
+            raw, ["guestName", "name"], "Unknown"
         )
 
         return Guest(
@@ -209,4 +208,3 @@ class HostToolsProvider(STRProvider):
             checkout=checkout,
             door_code=_first(raw, ["doorCode", "door_code"]),
         )
-
