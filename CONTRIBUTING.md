@@ -399,6 +399,12 @@ Before opening a PR:
 
 ---
 
+## Designers welcome too
+
+The integration ships with placeholder icon/logo PNGs under [`branding/`](branding/). If you can do better than the current cyan "STR" placeholder (and frankly, you can), the README in that directory walks through what's needed and how to submit real artwork to the [`home-assistant/brands`](https://github.com/home-assistant/brands) repo so it shows up in everyone's HA UI.
+
+---
+
 ## Questions, ideas, or stuck on something?
 
 Open an issue with the `provider-request` label — even a one-liner ("trying to add Lodgify, their auth is weird") is enough to start a conversation. We'd rather help you get it merged than have you give up halfway through.
