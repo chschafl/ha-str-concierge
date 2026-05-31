@@ -106,7 +106,7 @@ def _parse_time_of_day(value) -> tuple[int, int] | None:
         return None
     if isinstance(value, bool):
         return None  # bool is a subclass of int — exclude explicitly
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         if not math.isfinite(value):
             return None
         h = int(value)
