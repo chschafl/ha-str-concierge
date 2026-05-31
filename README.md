@@ -129,7 +129,7 @@ The integration creates a single **device** per property, with these entities gr
 | **Guest** | `Alice Smith` (the current booking's guest name) |
 | **Guest Status** | `reserved` / `due_in` / `in_house` / `departed` / `vacant` |
 | **House State** | `ready` / `occupied` / `dirty` / `cleaning` |
-| **Door Code** | `1234` — keep this off public dashboards |
+| **Door Code** | `1234` — hidden by default; enable per-entity in **Settings → Devices & Services → STR Concierge → Door Code → ⚙** if you want to show it on a dashboard |
 | **Check-in** | When the booking starts |
 | **Check-out** | When the booking ends |
 | **Lock Access Start** | check-in − "lock minutes before" |

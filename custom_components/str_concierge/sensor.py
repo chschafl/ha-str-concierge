@@ -64,6 +64,7 @@ class GuestNameSensor(STREntity, SensorEntity):
 class GuestDoorCodeSensor(STREntity, SensorEntity):
     _attr_translation_key = "door_code"
     _attr_icon = "mdi:lock-smart"
+    _attr_entity_registry_visible_default = False  # keep PIN off dashboards by default
 
     def __init__(self, coordinator: STRCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)
