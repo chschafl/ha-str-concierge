@@ -145,10 +145,11 @@ class TestGuestStateDerivation:
         assert coordinator.data.current_guest.name == "Kaite Sambrook"
         assert coordinator.data.guest_status == GUEST_DUE_IN
 
-    async def test_next_guest_NOT_promoted_outside_arrival_window(
+    async def test_next_guest_promoted_even_when_far_in_future(
         self, coordinator, mock_provider
     ):
-        """Far outside the arrival window, we stay vacant — no premature promotion."""
+        """Hosts always want to see who's coming next, even months away.
+        We promote next → current and report `reserved`, not `vacant`."""
         upcoming = Guest(
             booking_id="booking-NEXT",
             name="Kaite Sambrook",
@@ -162,8 +163,9 @@ class TestGuestStateDerivation:
             next_guest=upcoming,
         )
         await _tick(coordinator, _utc(2025, 6, 1, hour=12))
-        assert coordinator.data.current_guest is None
-        assert coordinator.data.guest_status == GUEST_VACANT
+        assert coordinator.data.current_guest is not None
+        assert coordinator.data.current_guest.name == "Kaite Sambrook"
+        assert coordinator.data.guest_status == GUEST_RESERVED
 
 
 class TestHouseState:

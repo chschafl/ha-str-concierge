@@ -352,17 +352,14 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         )
 
     def _promote_upcoming(self, pd: PropertyData) -> PropertyData:
-        """When current is empty but next is within the arrival window, promote.
+        """Surface the next booking as `current` whenever there's no real current.
 
-        We surface the upcoming guest as `current` so all the entities
-        (name, door code, check-in/out, lock window, status) populate the
-        moment we cross into `due_in`. This is what the README's "next booking
-        takes the Current Guest slot automatically" promise relies on.
+        We want hosts to always see who's coming next — even if the next booking
+        is months away. Status derivation will report `reserved` (far in the
+        future) or `due_in` (inside the arrival window) based on time-to-checkin.
+        `vacant` is reserved for the genuine "nobody booked, period" case.
         """
         if pd.current_guest is not None or pd.next_guest is None:
-            return pd
-        now = _now_utc()
-        if now < pd.next_guest.checkin - self._arrival_window:
             return pd
         return PropertyData(
             property_id=pd.property_id,

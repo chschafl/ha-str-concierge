@@ -34,7 +34,7 @@ No more programming door codes by hand. No more forgetting to reset the thermost
 
 Out of the box you get:
 
-- **A "Guest Status" sensor** — `reserved` (booked, not here yet) → `due_in` (arriving soon) → `in_house` (currently here) → `departed` (just checked out) → `vacant` (nobody home)
+- **A "Guest Status" sensor** — `reserved` (booked, not here yet) → `due_in` (arriving soon) → `in_house` (currently here) → `departed` (just checked out) → `vacant` (no future bookings at all). As soon as a guest goes `departed`, the next booking shows up — even if it's months away — so you always know who's coming.
 - **A "House State" sensor** — `ready` for the next guest, `occupied`, `dirty` (needs cleaning), `cleaning` (cleaner is on it)
 - **Current guest info** — name, check-in / check-out times, door code, calculated lock-access window
 - **Buttons for the cleaner** — "Mark Cleaning Started" and "Mark Ready" go right on a dashboard or HA mobile app
@@ -160,7 +160,7 @@ The integration is deliberately conservative about state transitions it can't be
 | `reserved` → `due_in` | Automatic (time-based, uses arrival window) |
 | `due_in` → `in_house` | Door-lock event (if a trigger is configured) **or** **Mark Guest Arrived** button |
 | `in_house` → `departed` | Automatic when `now ≥ checkout + courtesy window` **or** **Mark Guest Departed** button |
-| `departed` → next guest / `vacant` | Automatic, 10 seconds after `departed` |
+| `departed` → next guest / `vacant` | Automatic, 10 seconds after `departed`. Rotates to the next booking if one exists (whether it's in 2 hours or 6 months), else falls through to `vacant` |
 | House `occupied` → `dirty` | Automatic, the moment the guest goes `departed` |
 | House `dirty` → `cleaning` | Cleaner Keymaster slot PIN (if configured) **or** **Mark Cleaning Started** button |
 | House `cleaning` → `ready` | **Mark Ready** button — always manual |
