@@ -18,6 +18,7 @@ CONF_LOCK_TRIGGER_SOURCE = "lock_trigger_source"
 CONF_LOCK_ENTITY_ID = "lock_entity_id"
 CONF_LOCK_UNLOCK_STATES = "lock_unlock_states"
 CONF_KEYMASTER_SLOT = "keymaster_slot"
+CONF_CLEANER_KEYMASTER_SLOT = "cleaner_keymaster_slot"
 
 LOCK_TRIGGER_KEYMASTER = "keymaster"
 LOCK_TRIGGER_ENTITY = "entity"
@@ -42,6 +43,7 @@ DEFAULT_ARRIVAL_WINDOW_HOURS = 4
 DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN = 0
 DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT = 60
 DEFAULT_LOCK_UNLOCK_STATES = ["unlocked"]
+DEFAULT_LOCK_TRIGGER_SOURCE = LOCK_TRIGGER_DISABLED
 
 # How long the `departed` state is observable before the coordinator rotates
 # to the next guest. Gives HA automations a deterministic window to react.

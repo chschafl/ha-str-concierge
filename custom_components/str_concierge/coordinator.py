@@ -28,6 +28,7 @@ from .const import (
     GUEST_IN_HOUSE,
     GUEST_RESERVED,
     GUEST_VACANT,
+    HOUSE_CLEANING,
     HOUSE_DIRTY,
     HOUSE_OCCUPIED,
     HOUSE_READY,
@@ -221,6 +222,23 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         self._stored.house_state_changed_at = _now_utc().isoformat()
         await self._persist()
         await self.async_request_refresh()
+
+    async def async_handle_cleaner_arrived(self) -> None:
+        """Cleaner unlocked the door — flip `dirty` → `cleaning`.
+
+        Anything else (occupied, ready, already cleaning) is left alone — we
+        don't want a cleaner entering while a guest is in-house to silently
+        reset the workflow.
+        """
+        if self._stored.house_state == HOUSE_DIRTY:
+            _LOGGER.info("Cleaner arrival detected — flipping house: dirty → cleaning")
+            await self.async_set_house_state(HOUSE_CLEANING)
+        else:
+            _LOGGER.debug(
+                "Cleaner arrival detected but house state is %s — no change "
+                "(only auto-flips from `dirty`)",
+                self._stored.house_state,
+            )
 
     # ── Internal helpers ──────────────────────────────────────────────
 

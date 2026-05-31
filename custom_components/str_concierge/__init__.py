@@ -13,6 +13,7 @@ from .const import (
     CONF_API_KEY,
     CONF_ARRIVAL_WINDOW_HOURS,
     CONF_BASE_URL,
+    CONF_CLEANER_KEYMASTER_SLOT,
     CONF_KEYMASTER_SLOT,
     CONF_LOCK_ENTITY_ID,
     CONF_LOCK_MINUTES_AFTER_CHECKOUT,
@@ -25,6 +26,7 @@ from .const import (
     DEFAULT_ARRIVAL_WINDOW_HOURS,
     DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
     DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
+    DEFAULT_LOCK_TRIGGER_SOURCE,
     DEFAULT_LOCK_UNLOCK_STATES,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
@@ -118,12 +120,35 @@ def _install_lock_listener(
 ) -> list:
     """Install the configured lock-event listener. Returns unsubscriber callables."""
     options = entry.options
-    source = options.get(CONF_LOCK_TRIGGER_SOURCE, LOCK_TRIGGER_ENTITY)
+    source = options.get(CONF_LOCK_TRIGGER_SOURCE, DEFAULT_LOCK_TRIGGER_SOURCE)
     unsubs: list = []
+
+    # Cleaner keymaster slot is always installed regardless of the main lock
+    # trigger source — they're independent concerns.
+    cleaner_slot = options.get(CONF_CLEANER_KEYMASTER_SLOT, "").strip()
+    if cleaner_slot:
+        @callback
+        def _on_cleaner_event(event: Event) -> None:
+            data = event.data
+            event_slot = (
+                data.get("code_slot_name")
+                or data.get("slot_name")
+                or data.get("slot")
+            )
+            action = (data.get("action_text") or data.get("action") or "").lower()
+            if event_slot != cleaner_slot:
+                return
+            if action and "unlock" not in action and "keypad" not in action:
+                return
+            hass.async_create_task(coordinator.async_handle_cleaner_arrived())
+
+        unsubs.append(
+            hass.bus.async_listen(KEYMASTER_LOCK_EVENT, _on_cleaner_event)
+        )
 
     if source == LOCK_TRIGGER_DISABLED:
         _LOGGER.debug(
-            "Lock trigger disabled — arrival latching only via manual buttons"
+            "Guest lock trigger disabled — arrival latching only via manual buttons"
         )
         return unsubs
 

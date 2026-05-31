@@ -45,7 +45,8 @@
           "lock_trigger_source": "Fuente del evento de cerradura",
           "lock_entity_id": "ID de la entidad de cerradura (p. ej. lock.puerta_principal)",
           "lock_unlock_states": "Estados que cuentan como «desbloqueado» (separados por comas)",
-          "keymaster_slot": "Nombre del slot de Keymaster"
+          "keymaster_slot": "Slot de Keymaster (llegada del huésped)",
+          "cleaner_keymaster_slot": "Slot de Keymaster (llegada del personal de limpieza)"
         }
       }
     }

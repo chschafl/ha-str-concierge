@@ -45,7 +45,8 @@
           "lock_trigger_source": "Lock trigger source",
           "lock_entity_id": "Lock entity ID (e.g. lock.front_door)",
           "lock_unlock_states": "States that count as 'unlocked' (comma-separated)",
-          "keymaster_slot": "Keymaster code slot name"
+          "keymaster_slot": "Keymaster code slot name (guest arrival)",
+          "cleaner_keymaster_slot": "Keymaster code slot name (cleaner arrival)"
         }
       }
     }

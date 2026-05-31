@@ -13,6 +13,7 @@ from .const import (
     CONF_API_KEY,
     CONF_ARRIVAL_WINDOW_HOURS,
     CONF_BASE_URL,
+    CONF_CLEANER_KEYMASTER_SLOT,
     CONF_KEYMASTER_SLOT,
     CONF_LOCK_ENTITY_ID,
     CONF_LOCK_MINUTES_AFTER_CHECKOUT,
@@ -25,6 +26,7 @@ from .const import (
     DEFAULT_ARRIVAL_WINDOW_HOURS,
     DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
     DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
+    DEFAULT_LOCK_TRIGGER_SOURCE,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     LOCK_TRIGGER_DISABLED,
@@ -149,7 +151,7 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ARRIVAL_WINDOW_HOURS: DEFAULT_ARRIVAL_WINDOW_HOURS,
                     CONF_LOCK_MINUTES_BEFORE_CHECKIN: DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
                     CONF_LOCK_MINUTES_AFTER_CHECKOUT: DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
-                    CONF_LOCK_TRIGGER_SOURCE: LOCK_TRIGGER_ENTITY,
+                    CONF_LOCK_TRIGGER_SOURCE: DEFAULT_LOCK_TRIGGER_SOURCE,
                 },
             )
 
@@ -230,7 +232,9 @@ class STROptionsFlow(config_entries.OptionsFlow):
                 ): vol.All(int, vol.Range(min=0, max=720)),
                 vol.Required(
                     CONF_LOCK_TRIGGER_SOURCE,
-                    default=current.get(CONF_LOCK_TRIGGER_SOURCE, LOCK_TRIGGER_ENTITY),
+                    default=current.get(
+                        CONF_LOCK_TRIGGER_SOURCE, DEFAULT_LOCK_TRIGGER_SOURCE
+                    ),
                 ): vol.In(_LOCK_TRIGGER_LABELS),
                 vol.Optional(
                     CONF_LOCK_ENTITY_ID,
@@ -243,6 +247,10 @@ class STROptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_KEYMASTER_SLOT,
                     default=current.get(CONF_KEYMASTER_SLOT, ""),
+                ): str,
+                vol.Optional(
+                    CONF_CLEANER_KEYMASTER_SLOT,
+                    default=current.get(CONF_CLEANER_KEYMASTER_SLOT, ""),
                 ): str,
             }
         )

@@ -109,10 +109,11 @@ Open the integration's **Configure** panel any time after setup:
 | **Arrival window** (default: 4 hours) | How long before check-in time the guest status flips from `reserved` to `due_in` |
 | **Lock minutes before check-in** (default: 0) | How early the door code becomes valid |
 | **Lock minutes after check-out** (default: 60) | Courtesy window after checkout before the guest goes `departed` |
-| **Lock trigger source** | How STR Concierge detects "guest just entered". Pick **Lock entity** if you want to listen to any HA lock or door sensor, or **Keymaster slot event** if you're using Keymaster |
+| **Lock trigger source** (default: **Disabled**) | How STR Concierge detects "guest just entered". **Disabled** (default) means rely on the manual buttons only. Pick **Lock entity** to listen to any HA lock or door sensor, or **Keymaster slot event** if you're using Keymaster |
 | **Lock entity ID** | When trigger source is **Lock entity** — e.g. `lock.front_door` or `binary_sensor.front_door_unlocked` |
 | **Unlock states** | Which states of that entity count as "unlocked" (default: `unlocked`). Comma-separated |
-| **Keymaster slot name** | When trigger source is **Keymaster slot event** — the slot name (e.g. `str_guest`) |
+| **Keymaster slot name (guest arrival)** | When trigger source is **Keymaster slot event** — the slot name dedicated to the guest (e.g. `str_guest`) |
+| **Keymaster slot name (cleaner arrival)** | Optional, independent of the guest setting. When the cleaner enters this slot's PIN and the house is `dirty`, it auto-flips to `cleaning`. Leave blank to handle "cleaning started" via the manual button only |
 
 ---
 
@@ -149,6 +150,22 @@ The integration creates a single **device** per property, with these entities gr
 | **Mark Ready** | House `cleaning` → `ready` |
 
 The cleaning buttons are designed to be put right on a dashboard or the HA mobile app — your cleaner can tap them on arrival and departure.
+
+### What's automatic vs. what's manual
+
+The integration is deliberately conservative about state transitions it can't be sure about. Here's what each state change requires:
+
+| Transition | Trigger |
+|---|---|
+| `reserved` → `due_in` | Automatic (time-based, uses arrival window) |
+| `due_in` → `in_house` | Door-lock event (if a trigger is configured) **or** **Mark Guest Arrived** button |
+| `in_house` → `departed` | Automatic when `now ≥ checkout + courtesy window` **or** **Mark Guest Departed** button |
+| `departed` → next guest / `vacant` | Automatic, 10 seconds after `departed` |
+| House `occupied` → `dirty` | Automatic, the moment the guest goes `departed` |
+| House `dirty` → `cleaning` | Cleaner Keymaster slot PIN (if configured) **or** **Mark Cleaning Started** button |
+| House `cleaning` → `ready` | **Mark Ready** button — always manual |
+
+In short: **departures and "cleaning finished"** are the two transitions that the integration won't decide on its own. You either hit the button, or you wire up an automation that does (a geofence on the cleaner's phone, an NFC tag in the property, an HA voice command — whatever fits your workflow).
 
 ---
 
@@ -294,6 +311,14 @@ automation:
       target:
         entity_id: input_boolean.keymaster_str_guest_enabled
 ```
+
+**Step 5 (optional) — Give the cleaner their own Keymaster slot.**
+
+Create a second Keymaster code slot dedicated to your cleaner (e.g. `str_cleaner`) and give them a personal PIN. Then in **Settings → Devices & Services → STR Concierge → Configure**, set **Keymaster slot name (cleaner arrival)** to `str_cleaner`.
+
+From then on, when the cleaner enters their PIN and the house is `dirty`, the house state automatically flips to `cleaning` — your "house ready for cleaning" notification stops nagging you, and you have a timestamp of when work actually started. The cleaner still needs to press **Mark Ready** when they finish (or you can wire an automation off a geofence / NFC tag — see [What's automatic vs. what's manual](#whats-automatic-vs-whats-manual) above).
+
+The cleaner slot listener is independent of the **Lock trigger source** setting. You can leave that on **Disabled** and still get the cleaner auto-detect — they're separate concerns.
 
 ### Manual sync
 

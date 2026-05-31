@@ -45,7 +45,8 @@
           "lock_trigger_source": "Türschloss-Auslöser",
           "lock_entity_id": "Türschloss-Entität (z. B. lock.haustuer)",
           "lock_unlock_states": "Zustände, die als „aufgeschlossen“ gelten (kommagetrennt)",
-          "keymaster_slot": "Keymaster Code-Slot Name"
+          "keymaster_slot": "Keymaster Code-Slot Name (Gast-Ankunft)",
+          "cleaner_keymaster_slot": "Keymaster Code-Slot Name (Reinigungskraft)"
         }
       }
     }

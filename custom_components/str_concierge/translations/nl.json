@@ -45,7 +45,8 @@
           "lock_trigger_source": "Triggerbron voor slot",
           "lock_entity_id": "Slot-entiteit-ID (bv. lock.voordeur)",
           "lock_unlock_states": "Statussen die als 'ontgrendeld' gelden (komma-gescheiden)",
-          "keymaster_slot": "Keymaster-slotnaam"
+          "keymaster_slot": "Keymaster-slotnaam (gastaankomst)",
+          "cleaner_keymaster_slot": "Keymaster-slotnaam (schoonmaker)"
         }
       }
     }
