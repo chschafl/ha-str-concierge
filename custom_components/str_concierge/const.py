@@ -8,6 +8,7 @@ CONF_PROVIDER = "provider"
 CONF_API_KEY = "api_key"
 CONF_BASE_URL = "base_url"
 CONF_PROPERTY_ID = "property_id"
+CONF_PROPERTY_NAME = "property_name"
 CONF_POLL_INTERVAL = "poll_interval"
 
 # ── Options keys (editable after setup) ───────────────────────────────

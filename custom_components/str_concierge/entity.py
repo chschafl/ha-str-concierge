@@ -22,8 +22,14 @@ class STREntity(CoordinatorEntity[STRCoordinator]):
 
     @property
     def device_info(self):
+        # Prefer the live PMS-supplied name; fall back to the friendly name
+        # we captured during config flow (e.g. "Beach House"). Last resort
+        # is the opaque property ID — only reached for entries created
+        # before CONF_PROPERTY_NAME existed.
         state = self.state_data
-        name = state.property_name if state else self.coordinator.property_id
+        name = self.coordinator.property_name
+        if state and state.property_name and state.property_name != self.coordinator.property_id:
+            name = state.property_name
         return {
             "identifiers": {("str_concierge", self._entry_id, self.coordinator.property_id)},
             "name": name,

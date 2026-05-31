@@ -23,6 +23,7 @@ from .const import (
     CONF_LOCK_UNLOCK_STATES,
     CONF_POLL_INTERVAL,
     CONF_PROPERTY_ID,
+    CONF_PROPERTY_NAME,
     CONF_PROVIDER,
     CONF_VACANCY_THRESHOLD_DAYS,
     DEFAULT_ARRIVAL_WINDOW_MINUTES,
@@ -137,13 +138,21 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            picked_id = user_input[CONF_PROPERTY_ID]
+            # Look up the picked property's friendly name so the HA device
+            # registry shows "Beach House" rather than an opaque listing ID.
+            picked_name = next(
+                (p["name"] for p in self._available_properties if p["id"] == picked_id),
+                picked_id,
+            )
             return self.async_create_entry(
                 title=self._entry_title(),
                 data={
                     CONF_PROVIDER: self._provider,
                     CONF_API_KEY: self._api_key,
                     CONF_BASE_URL: self._base_url,
-                    CONF_PROPERTY_ID: user_input[CONF_PROPERTY_ID],
+                    CONF_PROPERTY_ID: picked_id,
+                    CONF_PROPERTY_NAME: picked_name,
                     CONF_POLL_INTERVAL: user_input.get(
                         CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
                     ),

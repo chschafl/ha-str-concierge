@@ -125,6 +125,7 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         vacancy_threshold_days: int,
         lock_minutes_before_checkin: int,
         lock_minutes_after_checkout: int,
+        property_name: str | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -134,6 +135,10 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         )
         self._provider = provider
         self._property_id = property_id
+        # Friendly name captured at config-flow time; PMS providers that
+        # don't return the listing name per poll fall back to this so the
+        # HA device shows the rental name instead of an opaque ID.
+        self._property_name = property_name or property_id
         self._entry_id = entry_id
         self._arrival_window = timedelta(minutes=arrival_window_minutes)
         self._vacancy_threshold = timedelta(days=vacancy_threshold_days)
@@ -154,6 +159,10 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
     @property
     def property_id(self) -> str:
         return self._property_id
+
+    @property
+    def property_name(self) -> str:
+        return self._property_name
 
     # ── Storage ───────────────────────────────────────────────────────
 

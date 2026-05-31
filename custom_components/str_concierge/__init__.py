@@ -22,6 +22,7 @@ from .const import (
     CONF_LOCK_UNLOCK_STATES,
     CONF_POLL_INTERVAL,
     CONF_PROPERTY_ID,
+    CONF_PROPERTY_NAME,
     CONF_PROVIDER,
     CONF_VACANCY_THRESHOLD_DAYS,
     DEFAULT_ARRIVAL_WINDOW_MINUTES,
@@ -74,12 +75,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     property_id: str = entry.data[CONF_PROPERTY_ID]
+    # Picked during the config flow; falls back to the ID for old entries
+    # that predate CONF_PROPERTY_NAME.
+    property_name: str = entry.data.get(CONF_PROPERTY_NAME, property_id)
     poll_interval: int = entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
 
     coordinator = STRCoordinator(
         hass=hass,
         provider=provider,
         property_id=property_id,
+        property_name=property_name,
         poll_interval=poll_interval,
         entry_id=entry.entry_id,
         arrival_window_minutes=arrival_minutes,

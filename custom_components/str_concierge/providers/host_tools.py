@@ -188,11 +188,16 @@ def _combine_date_and_time(date_value, time_value) -> datetime | None:
             return None
         h, m = time_of_day if time_of_day is not None else (0, 0)
         # dt_util.DEFAULT_TIME_ZONE follows HA's user-configured timezone.
+        tz = dt_util.DEFAULT_TIME_ZONE
         local = naive.replace(
-            hour=h, minute=m, second=0, microsecond=0,
-            tzinfo=dt_util.DEFAULT_TIME_ZONE,
+            hour=h, minute=m, second=0, microsecond=0, tzinfo=tz,
         )
-        return local.astimezone(timezone.utc)
+        result = local.astimezone(timezone.utc)
+        _LOGGER.debug(
+            "combine date+time: date=%r time=%r tz=%s → local=%s → utc=%s",
+            raw, time_value, tz, local.isoformat(), result.isoformat(),
+        )
+        return result
 
     base = _parse_dt(raw)
     if base is None:

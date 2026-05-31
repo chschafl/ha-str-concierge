@@ -42,6 +42,7 @@ def coordinator(hass, mock_provider):
         vacancy_threshold_days=30,
         lock_minutes_before_checkin=0,
         lock_minutes_after_checkout=60,
+        property_name="Beach House",
     )
     # Don't hit disk for the storage helper.
     with patch.object(coord, "_persist", return_value=None) as _:
