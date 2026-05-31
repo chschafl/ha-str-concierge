@@ -294,6 +294,13 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         # by promoting the next booking into the current slot.
         pd = self._apply_dismissal(pd)
 
+        # Promote next_guest → current_guest when their arrival window has
+        # opened but the PMS hasn't started the booking yet (PMS only marks
+        # a booking "current" between checkin and checkout). Without this,
+        # an upcoming guest would sit in `next` forever and the integration
+        # would just show `vacant`.
+        pd = self._promote_upcoming(pd)
+
         new_current_id = pd.current_guest.booking_id if pd.current_guest else None
 
         # Detect PMS-side booking rotation.
@@ -336,6 +343,26 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
             or pd.current_guest is None
             or pd.current_guest.booking_id != dismissed
         ):
+            return pd
+        return PropertyData(
+            property_id=pd.property_id,
+            property_name=pd.property_name,
+            current_guest=pd.next_guest,
+            next_guest=None,
+        )
+
+    def _promote_upcoming(self, pd: PropertyData) -> PropertyData:
+        """When current is empty but next is within the arrival window, promote.
+
+        We surface the upcoming guest as `current` so all the entities
+        (name, door code, check-in/out, lock window, status) populate the
+        moment we cross into `due_in`. This is what the README's "next booking
+        takes the Current Guest slot automatically" promise relies on.
+        """
+        if pd.current_guest is not None or pd.next_guest is None:
+            return pd
+        now = _now_utc()
+        if now < pd.next_guest.checkin - self._arrival_window:
             return pd
         return PropertyData(
             property_id=pd.property_id,

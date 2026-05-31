@@ -121,6 +121,50 @@ class TestGuestStateDerivation:
         await _tick(coordinator, _utc(2025, 5, 1))
         assert coordinator.data.guest_status == GUEST_VACANT
 
+    async def test_next_guest_promoted_to_current_inside_arrival_window(
+        self, coordinator, mock_provider
+    ):
+        """PMS only marks bookings 'current' between checkin and checkout.
+        Inside the arrival window we promote next → current so the entities
+        populate and status flips to due_in."""
+        upcoming = Guest(
+            booking_id="booking-NEXT",
+            name="Kaite Sambrook",
+            checkin=_utc(2025, 6, 1, hour=15),   # check-in in 2 hours
+            checkout=_utc(2025, 6, 3, hour=11),
+        )
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=upcoming,
+        )
+        # arrival_window_hours=4 (set in the fixture); 2h before checkin → in window.
+        await _tick(coordinator, _utc(2025, 6, 1, hour=13))
+        assert coordinator.data.current_guest is not None
+        assert coordinator.data.current_guest.name == "Kaite Sambrook"
+        assert coordinator.data.guest_status == GUEST_DUE_IN
+
+    async def test_next_guest_NOT_promoted_outside_arrival_window(
+        self, coordinator, mock_provider
+    ):
+        """Far outside the arrival window, we stay vacant — no premature promotion."""
+        upcoming = Guest(
+            booking_id="booking-NEXT",
+            name="Kaite Sambrook",
+            checkin=_utc(2025, 6, 5, hour=15),   # check-in 4+ days away
+            checkout=_utc(2025, 6, 7, hour=11),
+        )
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=upcoming,
+        )
+        await _tick(coordinator, _utc(2025, 6, 1, hour=12))
+        assert coordinator.data.current_guest is None
+        assert coordinator.data.guest_status == GUEST_VACANT
+
 
 class TestHouseState:
     async def test_house_state_defaults_to_ready(self, coordinator):
