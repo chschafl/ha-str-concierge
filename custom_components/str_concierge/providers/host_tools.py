@@ -14,9 +14,14 @@ inconsistent across endpoints and integration sources):
 
     _id / id / confirmationCode          → booking_id
     guestFirstName + guestLastName       → name (also: firstName + lastName)
-    checkIn / startDate                  → checkin
-    checkOut / endDate                   → checkout
-    doorCode / door_code                 → door_code
+    checkIn / startDate                  → checkin DATE
+    checkInTime / checkin_time           → checkin TIME of day (numeric hour
+                                           like 16, "HH:MM", "4 PM", etc.).
+                                           Combined with the date above.
+    checkOut / endDate                   → checkout DATE
+    checkOutTime / checkout_time         → checkout TIME of day
+    lockCode / doorCode / door_code      → door_code (lockCode is the
+        / accessCode                       canonical Host Tools field)
     status / reservationStatus           → filter; we keep only "accepted",
                                            "confirmed", "pending", "inquiry"
                                            and skip "cancelled", "canceled",
@@ -37,6 +42,8 @@ remains the source of truth for guest lifecycle.
 from __future__ import annotations
 
 import logging
+import math
+import re
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
@@ -85,6 +92,83 @@ def _parse_dt(value: str | None) -> datetime | None:
 
 def _ymd(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d")
+
+
+def _parse_time_of_day(value) -> tuple[int, int] | None:
+    """Return (hour, minute) from a Host Tools time field.
+
+    Accepts numeric (16 → 16:00, 16.5 → 16:30), bare digits ("16" → 16:00),
+    24-hour ("16:00"), 12-hour ("4:00 PM" / "4 PM"), or an ISO timestamp
+    (pulls the HH:MM portion). Returns None when the value is unparseable.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None  # bool is a subclass of int — exclude explicitly
+    if isinstance(value, (int, float)):
+        if not math.isfinite(value):
+            return None
+        h = int(value)
+        m = round((float(value) - h) * 60)
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            return h, m
+        return None
+
+    s = str(value).strip()
+    if not s:
+        return None
+
+    # Bare numeric string like "16"
+    if re.fullmatch(r"\d{1,2}", s):
+        h = int(s)
+        if 0 <= h <= 23:
+            return h, 0
+
+    # 24-hour "HH:MM" or "H:MM"
+    m24 = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
+    if m24:
+        h, mm = int(m24.group(1)), int(m24.group(2))
+        if 0 <= h <= 23 and 0 <= mm <= 59:
+            return h, mm
+
+    # 12-hour "h:mm AM/PM" or "h AM/PM"
+    m12 = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*([APap][Mm])", s)
+    if m12:
+        h = int(m12.group(1))
+        mm = int(m12.group(2)) if m12.group(2) else 0
+        ampm = m12.group(3).upper()
+        if 1 <= h <= 12 and 0 <= mm <= 59:
+            if ampm == "PM" and h < 12:
+                h += 12
+            elif ampm == "AM" and h == 12:
+                h = 0
+            return h, mm
+
+    # ISO timestamp — pull "T HH:MM"
+    iso = re.search(r"T(\d{2}):(\d{2})", s)
+    if iso:
+        return int(iso.group(1)), int(iso.group(2))
+
+    return None
+
+
+def _combine_date_and_time(date_value, time_value) -> datetime | None:
+    """Combine a date (or ISO datetime) with a separate time-of-day field.
+
+    Host Tools sends ``checkIn`` as just the date (``2026-06-01``) and
+    ``checkInTime`` separately as ``16`` or ``"16:00"``. We parse both,
+    then overwrite the date's time component with the explicit time
+    field when present. If the date already had a non-midnight time and
+    no explicit time field exists, the date's time wins.
+    """
+    base = _parse_dt(date_value)
+    if base is None:
+        return None
+    time_of_day = _parse_time_of_day(time_value)
+    if time_of_day is None:
+        return base
+    h, m = time_of_day
+    return base.replace(hour=h, minute=m, second=0, microsecond=0)
 
 
 class HostToolsProvider(STRProvider):
@@ -191,8 +275,19 @@ class HostToolsProvider(STRProvider):
             return None
 
         booking_id = _first(raw, ["_id", "id", "confirmationCode", "confirmation_code"])
-        checkin = _parse_dt(_first(raw, ["checkIn", "startDate", "start_date"]))
-        checkout = _parse_dt(_first(raw, ["checkOut", "endDate", "end_date"]))
+
+        # Host Tools sends date and time-of-day as separate fields:
+        # checkIn = "2026-06-01" (date only), checkInTime = 16 (4pm).
+        # Combine them so the integration's status/lock-window calculations
+        # use the real arrival/departure clock time.
+        checkin = _combine_date_and_time(
+            _first(raw, ["checkIn", "startDate", "start_date"]),
+            _first(raw, ["checkInTime", "checkin_time", "startTime"]),
+        )
+        checkout = _combine_date_and_time(
+            _first(raw, ["checkOut", "endDate", "end_date"]),
+            _first(raw, ["checkOutTime", "checkout_time", "endTime"]),
+        )
 
         if not all([booking_id, checkin, checkout]):
             _LOGGER.debug("Skipping incomplete reservation: %s", raw)
@@ -204,10 +299,23 @@ class HostToolsProvider(STRProvider):
             raw, ["guestName", "name"], "Unknown"
         )
 
+        # `lockCode` is the field name Host Tools actually uses; doorCode /
+        # door_code / accessCode are kept as defensive aliases for variant
+        # payloads and historical/integration responses.
+        door_code = _first(
+            raw, ["lockCode", "doorCode", "door_code", "accessCode", "access_code"]
+        )
+        if not door_code:
+            _LOGGER.debug(
+                "Reservation %s parsed without a door code — raw keys: %s",
+                booking_id,
+                sorted(raw.keys()),
+            )
+
         return Guest(
             booking_id=str(booking_id),
             name=name,
             checkin=checkin,
             checkout=checkout,
-            door_code=_first(raw, ["doorCode", "door_code"]),
+            door_code=door_code,
         )

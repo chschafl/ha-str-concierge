@@ -63,9 +63,32 @@ Host Tools is inconsistent across endpoints and integration sources, so each of 
 |---|---|
 | `booking_id` | `_id`, `id`, `confirmationCode`, `confirmation_code` |
 | `name` | `guestFirstName + ' ' + guestLastName`, falling back to `firstName + ' ' + lastName`, falling back to `guestName` or `name` |
-| `checkin` | `checkIn`, `startDate`, `start_date` |
-| `checkout` | `checkOut`, `endDate`, `end_date` |
-| `door_code` | `doorCode`, `door_code` |
+| `checkin` *(date)* | `checkIn`, `startDate`, `start_date` |
+| `checkin` *(time of day)* | `checkInTime`, `checkin_time`, `startTime` — combined with the date above |
+| `checkout` *(date)* | `checkOut`, `endDate`, `end_date` |
+| `checkout` *(time of day)* | `checkOutTime`, `checkout_time`, `endTime` |
+| `door_code` | `lockCode`, `doorCode`, `door_code`, `accessCode`, `access_code` |
+
+### Date + time-of-day handling
+
+Host Tools sends the check-in date and the check-in time-of-day as **separate fields** — `checkIn` is just `"2026-06-01"`, with `checkInTime` carrying the hour. The provider combines them so the integration's lock-window and `due_in` calculations use the real arrival clock, not midnight UTC.
+
+The time field is parsed in any of these forms:
+
+| Input | Interpretation |
+|---|---|
+| `16` (number) | `16:00` |
+| `15.5` (number) | `15:30` |
+| `"16"` (string) | `16:00` |
+| `"15:30"` (string) | `15:30` |
+| `"4:00 PM"` / `"4 PM"` | `16:00` |
+| ISO timestamp containing `T16:00` | `16:00` |
+
+If the explicit time field is missing but the date field is a full ISO timestamp, the time portion of the ISO string wins. If neither has a time, the booking defaults to midnight UTC and the host is expected to compensate via the lock-window offsets.
+
+### Door code
+
+The canonical Host Tools field is **`lockCode`**. The provider also accepts `doorCode`, `door_code`, `accessCode`, and `access_code` defensively, since variant integration payloads sometimes use those instead. When a reservation parses successfully but no door code is found, the provider logs the full payload key list at DEBUG so you can see what's actually there.
 
 **Listings (`Property`)**:
 

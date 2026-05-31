@@ -174,3 +174,153 @@ class TestAuthHeader:
             headers = call_args.kwargs.get("headers", {})
             assert headers.get("authToken") == "test-token"
             assert "Authorization" not in headers
+
+
+class TestCheckInOutTimes:
+    """Host Tools sends date and time-of-day as separate fields. Verify the
+    combiner respects the explicit time field over the date's time."""
+
+    async def test_combines_date_with_numeric_hour(self, provider):
+        response = [
+            {
+                "_id": "res-numeric",
+                "guestName": "Numeric Hour",
+                "checkIn": "2025-06-01",      # date only
+                "checkInTime": 16,             # 4pm as numeric
+                "checkOut": "2099-12-31",
+                "checkOutTime": 11,
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 16
+        assert data.current_guest.checkin.minute == 0
+        assert data.current_guest.checkout.hour == 11
+
+    async def test_combines_date_with_string_hhmm(self, provider):
+        response = [
+            {
+                "_id": "res-hhmm",
+                "guestName": "HHMM String",
+                "checkIn": "2025-06-01",
+                "checkInTime": "15:30",
+                "checkOut": "2099-12-31",
+                "checkOutTime": "11:00",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 15
+        assert data.current_guest.checkin.minute == 30
+
+    async def test_combines_date_with_12_hour_string(self, provider):
+        response = [
+            {
+                "_id": "res-12h",
+                "guestName": "12 Hour",
+                "checkIn": "2025-06-01",
+                "checkInTime": "4:00 PM",
+                "checkOut": "2099-12-31",
+                "checkOutTime": "11 AM",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 16
+        assert data.current_guest.checkout.hour == 11
+
+    async def test_combines_fractional_numeric_hour(self, provider):
+        response = [
+            {
+                "_id": "res-frac",
+                "guestName": "Half Past",
+                "checkIn": "2025-06-01",
+                "checkInTime": 15.5,           # 3:30 pm
+                "checkOut": "2099-12-31",
+                "checkOutTime": 10.25,         # 10:15
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert (data.current_guest.checkin.hour, data.current_guest.checkin.minute) == (15, 30)
+        assert (data.current_guest.checkout.hour, data.current_guest.checkout.minute) == (10, 15)
+
+    async def test_falls_back_to_date_time_when_no_explicit_time(self, provider):
+        """If only a full ISO datetime is sent (no separate time field),
+        use the time embedded in the date string."""
+        response = [
+            {
+                "_id": "res-iso",
+                "guestName": "ISO Only",
+                "checkIn": "2025-06-01T14:00:00Z",
+                "checkOut": "2099-12-31T10:00:00Z",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 14
+
+    async def test_date_only_without_time_defaults_to_midnight(self, provider):
+        """Date-only without an explicit time field falls through to midnight,
+        which is correct for the underlying parser. (Hosts who care will
+        configure their lock window to compensate.)"""
+        response = [
+            {
+                "_id": "res-midnight",
+                "guestName": "Midnight",
+                "checkIn": "2025-06-01",
+                "checkOut": "2099-12-31",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.checkin.hour == 0
+
+
+class TestDoorCode:
+    async def test_lock_code_field_is_canonical(self, provider):
+        """Host Tools sends the door PIN under `lockCode`."""
+        response = [
+            {
+                "_id": "res-lc",
+                "guestName": "Lock Code",
+                "checkIn": "2025-06-01T15:00:00Z",
+                "checkOut": "2099-12-31T11:00:00Z",
+                "lockCode": "9876",
+                "status": "accepted",
+            }
+        ]
+        with aioresponses() as m:
+            m.get(RESERVATIONS_URL_RE, payload=response)
+            data = await provider.get_property_data("listing-1")
+        assert data.current_guest.door_code == "9876"
+
+    async def test_door_code_aliases_still_work(self, provider):
+        """Legacy/variant payloads can still use doorCode etc."""
+        for key in ("doorCode", "door_code", "accessCode"):
+            response = [
+                {
+                    "_id": f"res-{key}",
+                    "guestName": key,
+                    "checkIn": "2025-06-01T15:00:00Z",
+                    "checkOut": "2099-12-31T11:00:00Z",
+                    key: "1111",
+                    "status": "accepted",
+                }
+            ]
+            with aioresponses() as m:
+                m.get(RESERVATIONS_URL_RE, payload=response)
+                data = await provider.get_property_data("listing-1")
+            assert data.current_guest.door_code == "1111", f"failed for key={key}"
