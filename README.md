@@ -168,6 +168,57 @@ The integration is deliberately conservative about state transitions it can't be
 
 In short: **departures and "cleaning finished"** are the two transitions that the integration won't decide on its own. You either hit the button, or you wire up an automation that does (a geofence on the cleaner's phone, an NFC tag in the property, an HA voice command — whatever fits your workflow).
 
+### Lifecycle diagrams
+
+Below: the state machines for the **guest status** and **house state** sensors, with the configuration knob that drives each transition labelled on the arrow. All the timing values are editable in **Settings → Devices & Services → STR Concierge → Configure**.
+
+#### Guest status
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> vacant
+    vacant --> reserved : next booking checkin\nwithin vacancy_threshold_days\n(default 30)
+    reserved --> due_in : now ≥ checkin −\narrival_window_minutes\n(default 240 = 4h)
+    due_in --> in_house : lock event in window OR\n"Mark Guest Arrived" button
+    in_house --> departed : now ≥ checkout +\nlock_minutes_after_checkout\n(default 60) OR\n"Mark Guest Departed" button
+    departed --> reserved : after 10s dwell\nif next booking exists\nwithin vacancy_threshold
+    departed --> vacant : after 10s dwell\nif no next booking
+    note right of due_in
+        Lock-access window =
+        [checkin − lock_minutes_before_checkin
+         .. checkout + lock_minutes_after_checkout]
+        Only unlock events inside that window
+        latch in_house.
+    end note
+```
+
+#### House state
+
+The house state is **independent** of the guest state, except for the two automatic crossings shown below. Cleaning workflow transitions are always driven by either the cleaner's Keymaster PIN or a manual button.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> ready
+    ready --> occupied : guest enters in_house\n(automatic)
+    occupied --> dirty : guest enters departed\n(automatic)
+    dirty --> cleaning : cleaner Keymaster PIN\nOR "Mark Cleaning Started"
+    cleaning --> ready : "Mark Ready" button\n(always manual)
+```
+
+#### Config knobs at a glance
+
+| Knob | Affects | Default |
+|---|---|---|
+| `vacancy_threshold_days` | `vacant ↔ reserved` cutoff. Also the provider's fetch window. | 30 |
+| `arrival_window_minutes` | `reserved → due_in` trigger | 240 (4 hours) |
+| `lock_minutes_before_checkin` | When the lock-access window opens (earlier = earlier `in_house` possible) | 0 |
+| `lock_minutes_after_checkout` | When the lock-access window closes; also drives `in_house → departed` | 60 |
+| `lock_trigger_source` | What counts as a lock-unlock event: `disabled` / `entity` / `keymaster` | `disabled` |
+| `keymaster_slot` | Guest's Keymaster slot name (when `lock_trigger_source = keymaster`) | — |
+| `cleaner_keymaster_slot` | Cleaner's Keymaster slot for `dirty → cleaning` (independent of `lock_trigger_source`) | — |
+
 ---
 
 ## Automation recipes
