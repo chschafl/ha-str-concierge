@@ -115,8 +115,6 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema_dict: dict = {vol.Required(CONF_API_KEY): str}
         if needs_url:
             schema_dict[vol.Required(CONF_BASE_URL)] = str
-        elif self._provider == PROVIDER_GUESTY:
-            schema_dict[vol.Optional(CONF_BASE_URL)] = str
 
         description_placeholders = {}
         if self._provider == PROVIDER_GUESTY:

@@ -33,9 +33,9 @@ PROVIDER_GUESTY = "guesty"
 
 PROVIDER_OPTIONS = [
     PROVIDER_HOST_TOOLS,
-    PROVIDER_CUSTOM,
     PROVIDER_HOSTFULLY,
     PROVIDER_GUESTY,
+    PROVIDER_CUSTOM,
 ]
 
 # ── Defaults ──────────────────────────────────────────────────────────
