@@ -5,85 +5,102 @@ API reference: <https://help.hosttools.com/en/articles/10118922-host-tools-api-d
 
 ## Auth
 
-Bearer token passed as the `Authorization` header on every request:
+Host Tools uses a **custom header** — **not** standard Bearer auth:
 
 ```
-Authorization: Bearer <token>
+authToken: <your-token>
 ```
+
+If you try `Authorization: Bearer <token>` against Host Tools you'll get back the marketing site HTML instead of an API response (the request is silently routed to the React app shell). The custom `authToken` header is the only one that wakes up the API layer.
 
 Get your token from the Host Tools dashboard under **Settings → API**.
 
 ## Base URL
 
 ```
-https://app.hosttools.com/api/v1
+https://app.hosttools.com/api
 ```
 
-Overridable via the provider's `base_url` constructor argument (the integration's config flow doesn't expose this — it's a hook for tests and custom deployments).
+No `/v1` path segment. Overridable via the provider's `base_url` constructor argument (not exposed in the config flow — it's a hook for tests and custom deployments).
+
+## Listing ID is required up front
+
+Host Tools' public API does **not** expose a "list all my listings" endpoint. The user therefore enters their listing ID during the integration's setup flow, alongside the API token. It's persisted in the config entry data and passed to `HostToolsProvider(listing_id=...)`.
+
+Where to find it: the dashboard URL for a listing is shaped like
+
+```
+https://app.hosttools.com/listings/<listing_id>/...
+```
+
+— that opaque ID is what you paste into the config flow.
 
 ## Endpoints used
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/listings` | List all properties accessible with this token |
-| `GET` | `/reservations?listingId={id}` | Active + upcoming bookings for one listing |
-| `PATCH` | `/reservations/{id}` | Update reservation status (used for `mark_arrived` / `mark_checked_out`) |
+| `GET` | `/getReservations/{listingId}/{startDate}/{endDate}` | All reservations whose `[checkIn, checkOut]` overlaps the date window |
 
-The integration polls `/reservations` every `poll_interval` seconds (default 300) and runs `_pick_current_and_next()` over the result to figure out which booking is `current` and which is `next`.
+Dates in the path are formatted as `YYYY-MM-DD` (UTC). The integration queries a rolling window from "yesterday" through "+180 days" on each poll — enough to surface the still-active checkout from earlier today, the current guest, and the next several months of upcoming bookings without pulling the entire calendar.
+
+`get_properties()` (called by the config flow to validate credentials) reuses this endpoint with a one-day window — if the call succeeds, the token + listing ID are valid; if not, the config flow shows `cannot_connect`.
 
 ## Response handling
 
-Both list endpoints accept either:
+The endpoint returns either:
 
 - A raw JSON array: `[ {...}, {...} ]`
-- A wrapped envelope: `{ "listings": [...] }` or `{ "data": [...] }` (for `/listings`), `{ "reservations": [...] }` or `{ "data": [...] }` (for `/reservations`)
+- A wrapped envelope: `{ "reservations": [...] }` or `{ "data": [...] }`
 
-The provider unwraps both shapes transparently.
+Both shapes are unwrapped transparently.
+
+## Status filtering
+
+Host Tools includes calendar blocks and cancelled bookings in the same response stream as real reservations. The provider filters by the `status` (or `reservationStatus`) field:
+
+| Bucket | Values | What we do |
+|---|---|---|
+| **Active** | `accepted`, `confirmed`, `pending`, `inquiry` | Surface as a guest |
+| **Skip** | `cancelled`, `canceled`, `declined`, `blocked` | Drop silently |
+| **Unknown** | anything else | Drop with a DEBUG log line |
 
 ## Field mapping
 
-Host Tools' JSON keys → our `Guest` dataclass fields, with fallback aliases for resilience to API changes:
+Host Tools is inconsistent across endpoints and integration sources, so each of our fields tries multiple candidate keys in order:
 
-| Field | Candidate JSON keys (in order) |
+| Our `Guest` field | Host Tools keys (in order) |
 |---|---|
-| `booking_id` | `_id`, `id`, `reservationId` |
-| `name` | `guestName`, `guest_name`, `name` |
-| `checkin` | `startDate`, `checkIn`, `check_in`, `start_date` |
-| `checkout` | `endDate`, `checkOut`, `check_out`, `end_date` |
-| `door_code` | `doorCode`, `door_code`, `accessCode`, `access_code` |
+| `booking_id` | `_id`, `id`, `confirmationCode`, `confirmation_code` |
+| `name` | `guestFirstName + ' ' + guestLastName`, falling back to `firstName + ' ' + lastName`, falling back to `guestName` or `name` |
+| `checkin` | `checkIn`, `startDate`, `start_date` |
+| `checkout` | `checkOut`, `endDate`, `end_date` |
+| `door_code` | `doorCode`, `door_code` |
 
-And for `Property` (listing):
-
-| Field | Candidate JSON keys (in order) |
-|---|---|
-| `id` | `_id`, `id`, `listingId` |
-| `name` | `nickname`, `name`, `title` |
-
-If Host Tools changes a field name, the fix is to add the new name to the corresponding list in `_RESERVATION_FIELD_MAP` / `_LISTING_FIELD_MAP` — no other code changes required.
-
-## Status updates back to Host Tools
-
-`mark_arrived(booking_id)` → `PATCH /reservations/{booking_id}` with body `{"status": "arrived"}`
-`mark_checked_out(booking_id)` → `PATCH /reservations/{booking_id}` with body `{"status": "checked_out"}`
-
-Both return `True` on success and raise on HTTP error. The integration calls these best-effort when the user manually presses the "Mark Guest Arrived" / "Mark Guest Departed" buttons — failures are logged but don't roll back the local lifecycle state.
+If Host Tools changes a key name, the fix is to append the new name to the matching list in `_parse_reservation` — no other code changes required.
 
 ## Datetime parsing
 
-The provider tries these formats in order:
+Tries these formats in order:
 
 1. `%Y-%m-%dT%H:%M:%S.%fZ` — ISO-8601 with milliseconds, UTC Z
 2. `%Y-%m-%dT%H:%M:%SZ` — ISO-8601, UTC Z
 3. `%Y-%m-%dT%H:%M:%S%z` — ISO-8601 with offset
 4. `%Y-%m-%d` — date only (treated as midnight UTC)
 
-Naive datetimes (no tzinfo) are stamped UTC.
+Naive datetimes get stamped UTC.
+
+## `mark_arrived` / `mark_checked_out`
+
+**Not implemented.** Host Tools' API has `POST /setreservation/{id}` for writing fields like `doorCode` and `guideBookURL`, but there isn't a clean "advance the reservation status" call that maps to STR Concierge's arrived/departed lifecycle. The integration's local state is the source of truth for the guest lifecycle anyway — the lock event drives `in_house`, time + courtesy window drives `departed` — so the missing write-back doesn't degrade behavior.
+
+If a future Host Tools API release adds proper status transitions, this is the place to wire them in.
 
 ## Known quirks
 
-- The `/reservations` endpoint requires the `listingId` query param. Without it you get every reservation across every listing.
-- `property_name` in the returned `PropertyData` is currently set to `property_id` (Host Tools doesn't include the listing name in the reservation payload, and we'd need a second HTTP call to look it up). HA's device registry lets the user rename the device, so this is rarely user-visible.
-- Bookings with missing `checkin`, `checkout`, or `booking_id` are silently skipped (logged at DEBUG). This guards against partial blocks / drafts in the calendar.
+- **The wrong base URL silently returns HTML.** `https://app.hosttools.com/api/v1/listings` (which a previous version of this provider used) returns the React marketing-site HTML instead of a 404, because `app.hosttools.com` serves both the dashboard SPA and the API and falls through to the SPA on unknown paths. If you see HTML in a debug log, the base URL or path is wrong.
+- **`Authorization: Bearer` is silently ignored.** Same failure mode as above — Host Tools doesn't 401 on the wrong header, it just returns the SPA. The custom `authToken` header is mandatory.
+- **`property_name` mirrors `property_id`.** Host Tools doesn't include the listing name in the reservation payload, and we'd need a second HTTP call to look it up. HA's device registry lets the user rename the device, so this is rarely user-visible.
+- **Bookings with missing `checkin`, `checkout`, or `booking_id` are silently skipped** (logged at DEBUG). This guards against partial blocks / drafts in the calendar.
 
 ## Testing
 

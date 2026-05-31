@@ -10,6 +10,10 @@ CONF_BASE_URL = "base_url"
 CONF_PROPERTY_ID = "property_id"
 CONF_POLL_INTERVAL = "poll_interval"
 
+# Per-provider extras. Host Tools has no listings-list endpoint, so the user
+# supplies their listing ID during setup; we store it in config entry data.
+CONF_HOST_TOOLS_LISTING_ID = "host_tools_listing_id"
+
 # ── Options keys (editable after setup) ───────────────────────────────
 CONF_ARRIVAL_WINDOW_HOURS = "arrival_window_hours"
 CONF_LOCK_MINUTES_BEFORE_CHECKIN = "lock_minutes_before_checkin"
