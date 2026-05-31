@@ -39,7 +39,8 @@
         "title": "STR Concierge Optionen",
         "description": "Stelle das Ankunftsfenster, das Türschloss-Zugangsfenster und die Erkennung des Gasteinzugs ein.",
         "data": {
-          "arrival_window_hours": "Ankunftsfenster (Stunden vor Check-in)",
+          "arrival_window_minutes": "Ankunftsfenster (Minuten vor Check-in)",
+          "vacancy_threshold_days": "Leerstandsschwelle (Tage) — `vacant`, wenn innerhalb dieser Tage keine Buchung liegt",
           "lock_minutes_before_checkin": "Schloss aktiv N Minuten VOR Check-in",
           "lock_minutes_after_checkout": "Schloss aktiv N Minuten NACH Check-out",
           "lock_trigger_source": "Türschloss-Auslöser",

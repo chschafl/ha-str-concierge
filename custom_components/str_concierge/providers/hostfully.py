@@ -54,9 +54,15 @@ def _parse_dt(value: str | None) -> datetime | None:
 class HostfullyProvider(STRProvider):
     """Provider backed by the Hostfully PMP API v3."""
 
-    def __init__(self, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str | None = None,
+        lookahead_days: int = 30,
+    ) -> None:
         super().__init__(api_key, base_url or BASE_URL)
         self._agency_uid: str | None = None
+        self._lookahead = timedelta(days=lookahead_days)
 
     def _headers(self) -> dict:
         return {
@@ -133,7 +139,7 @@ class HostfullyProvider(STRProvider):
         agency_uid = await self._ensure_agency()
         now = datetime.now(timezone.utc)
         from_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        to_date = (now + timedelta(days=90)).strftime("%Y-%m-%d")
+        to_date = (now + self._lookahead).strftime("%Y-%m-%d")
 
         data = await self._get(
             "/leads",

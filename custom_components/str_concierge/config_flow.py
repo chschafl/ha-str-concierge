@@ -8,10 +8,11 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_API_KEY,
-    CONF_ARRIVAL_WINDOW_HOURS,
+    CONF_ARRIVAL_WINDOW_MINUTES,
     CONF_BASE_URL,
     CONF_CLEANER_KEYMASTER_SLOT,
     CONF_KEYMASTER_SLOT,
@@ -23,11 +24,13 @@ from .const import (
     CONF_POLL_INTERVAL,
     CONF_PROPERTY_ID,
     CONF_PROVIDER,
-    DEFAULT_ARRIVAL_WINDOW_HOURS,
+    CONF_VACANCY_THRESHOLD_DAYS,
+    DEFAULT_ARRIVAL_WINDOW_MINUTES,
     DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
     DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
     DEFAULT_LOCK_TRIGGER_SOURCE,
     DEFAULT_POLL_INTERVAL,
+    DEFAULT_VACANCY_THRESHOLD_DAYS,
     DOMAIN,
     LOCK_TRIGGER_DISABLED,
     LOCK_TRIGGER_ENTITY,
@@ -148,7 +151,8 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 },
                 options={
-                    CONF_ARRIVAL_WINDOW_HOURS: DEFAULT_ARRIVAL_WINDOW_HOURS,
+                    CONF_ARRIVAL_WINDOW_MINUTES: DEFAULT_ARRIVAL_WINDOW_MINUTES,
+                    CONF_VACANCY_THRESHOLD_DAYS: DEFAULT_VACANCY_THRESHOLD_DAYS,
                     CONF_LOCK_MINUTES_BEFORE_CHECKIN: DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
                     CONF_LOCK_MINUTES_AFTER_CHECKOUT: DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
                     CONF_LOCK_TRIGGER_SOURCE: DEFAULT_LOCK_TRIGGER_SOURCE,
@@ -201,6 +205,15 @@ class STROptionsFlow(config_entries.OptionsFlow):
                 user_input[CONF_LOCK_UNLOCK_STATES] = [
                     s.strip() for s in raw_states.split(",") if s.strip()
                 ] or ["unlocked"]
+            # NumberSelector returns floats; coerce numeric fields back to int.
+            for key in (
+                CONF_ARRIVAL_WINDOW_MINUTES,
+                CONF_VACANCY_THRESHOLD_DAYS,
+                CONF_LOCK_MINUTES_BEFORE_CHECKIN,
+                CONF_LOCK_MINUTES_AFTER_CHECKOUT,
+            ):
+                if key in user_input and user_input[key] is not None:
+                    user_input[key] = int(user_input[key])
             return self.async_create_entry(title="", data=user_input)
 
         current = self._config_entry.options
@@ -208,28 +221,48 @@ class STROptionsFlow(config_entries.OptionsFlow):
         if isinstance(current_unlock_states, list):
             current_unlock_states = ", ".join(current_unlock_states)
 
+        # Use a text-box number input (not a slider) for every integer field.
+        minutes_box = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=10080, step=1, mode=selector.NumberSelectorMode.BOX,
+                unit_of_measurement="min",
+            )
+        )
+        days_box = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=365, step=1, mode=selector.NumberSelectorMode.BOX,
+                unit_of_measurement="d",
+            )
+        )
+
         schema = vol.Schema(
             {
                 vol.Required(
-                    CONF_ARRIVAL_WINDOW_HOURS,
+                    CONF_ARRIVAL_WINDOW_MINUTES,
                     default=current.get(
-                        CONF_ARRIVAL_WINDOW_HOURS, DEFAULT_ARRIVAL_WINDOW_HOURS
+                        CONF_ARRIVAL_WINDOW_MINUTES, DEFAULT_ARRIVAL_WINDOW_MINUTES
                     ),
-                ): vol.All(int, vol.Range(min=0, max=72)),
+                ): minutes_box,
+                vol.Required(
+                    CONF_VACANCY_THRESHOLD_DAYS,
+                    default=current.get(
+                        CONF_VACANCY_THRESHOLD_DAYS, DEFAULT_VACANCY_THRESHOLD_DAYS
+                    ),
+                ): days_box,
                 vol.Required(
                     CONF_LOCK_MINUTES_BEFORE_CHECKIN,
                     default=current.get(
                         CONF_LOCK_MINUTES_BEFORE_CHECKIN,
                         DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
                     ),
-                ): vol.All(int, vol.Range(min=0, max=720)),
+                ): minutes_box,
                 vol.Required(
                     CONF_LOCK_MINUTES_AFTER_CHECKOUT,
                     default=current.get(
                         CONF_LOCK_MINUTES_AFTER_CHECKOUT,
                         DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
                     ),
-                ): vol.All(int, vol.Range(min=0, max=720)),
+                ): minutes_box,
                 vol.Required(
                     CONF_LOCK_TRIGGER_SOURCE,
                     default=current.get(

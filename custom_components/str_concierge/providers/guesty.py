@@ -52,9 +52,15 @@ def _parse_dt(value: str | None) -> datetime | None:
 class GuestyProvider(STRProvider):
     """Provider backed by the Guesty Open API v1 (OAuth2 client credentials)."""
 
-    def __init__(self, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str | None = None,
+        lookahead_days: int = 30,
+    ) -> None:
         """api_key must be 'client_id:client_secret'."""
         super().__init__(api_key, base_url or BASE_URL)
+        self._lookahead = timedelta(days=lookahead_days)
         parts = api_key.split(":", 1)
         if len(parts) != 2:
             raise ValueError(
@@ -158,7 +164,7 @@ class GuestyProvider(STRProvider):
     async def get_property_data(self, property_id: str) -> PropertyData:
         now = datetime.now(timezone.utc)
         from_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        to_date = (now + timedelta(days=90)).strftime("%Y-%m-%d")
+        to_date = (now + self._lookahead).strftime("%Y-%m-%d")
 
         data = await self._get(
             "/reservations",

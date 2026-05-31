@@ -11,7 +11,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
     CONF_API_KEY,
-    CONF_ARRIVAL_WINDOW_HOURS,
+    CONF_ARRIVAL_WINDOW_MINUTES,
     CONF_BASE_URL,
     CONF_CLEANER_KEYMASTER_SLOT,
     CONF_KEYMASTER_SLOT,
@@ -23,12 +23,14 @@ from .const import (
     CONF_POLL_INTERVAL,
     CONF_PROPERTY_ID,
     CONF_PROVIDER,
-    DEFAULT_ARRIVAL_WINDOW_HOURS,
+    CONF_VACANCY_THRESHOLD_DAYS,
+    DEFAULT_ARRIVAL_WINDOW_MINUTES,
     DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
     DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
     DEFAULT_LOCK_TRIGGER_SOURCE,
     DEFAULT_LOCK_UNLOCK_STATES,
     DEFAULT_POLL_INTERVAL,
+    DEFAULT_VACANCY_THRESHOLD_DAYS,
     DOMAIN,
     KEYMASTER_CODE_SLOT_PATTERN,
     KEYMASTER_DATE_END_PATTERN,
@@ -50,25 +52,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up STR Concierge from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
+    options = entry.options
+
+    # Backward-compat: earlier versions stored arrival window in hours.
+    arrival_minutes = options.get(CONF_ARRIVAL_WINDOW_MINUTES)
+    if arrival_minutes is None:
+        legacy_hours = options.get("arrival_window_hours")
+        arrival_minutes = (
+            legacy_hours * 60 if legacy_hours is not None else DEFAULT_ARRIVAL_WINDOW_MINUTES
+        )
+
+    vacancy_threshold_days = options.get(
+        CONF_VACANCY_THRESHOLD_DAYS, DEFAULT_VACANCY_THRESHOLD_DAYS
+    )
+
     provider = create_provider(
         provider_type=entry.data[CONF_PROVIDER],
         api_key=entry.data[CONF_API_KEY],
         base_url=entry.data.get(CONF_BASE_URL),
+        lookahead_days=vacancy_threshold_days,
     )
 
     property_id: str = entry.data[CONF_PROPERTY_ID]
     poll_interval: int = entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
 
-    options = entry.options
     coordinator = STRCoordinator(
         hass=hass,
         provider=provider,
         property_id=property_id,
         poll_interval=poll_interval,
         entry_id=entry.entry_id,
-        arrival_window_hours=options.get(
-            CONF_ARRIVAL_WINDOW_HOURS, DEFAULT_ARRIVAL_WINDOW_HOURS
-        ),
+        arrival_window_minutes=arrival_minutes,
+        vacancy_threshold_days=vacancy_threshold_days,
         lock_minutes_before_checkin=options.get(
             CONF_LOCK_MINUTES_BEFORE_CHECKIN, DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN
         ),

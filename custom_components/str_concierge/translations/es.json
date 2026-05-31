@@ -39,7 +39,8 @@
         "title": "Opciones de STR Concierge",
         "description": "Ajusta la ventana de llegada, la ventana de acceso a la cerradura y cómo se detecta que el huésped ha entrado en la casa.",
         "data": {
-          "arrival_window_hours": "Ventana de llegada (horas antes del check-in)",
+          "arrival_window_minutes": "Ventana de llegada (minutos antes del check-in)",
+          "vacancy_threshold_days": "Umbral de vacante (días) — mostrar `vacant` cuando no haya reservas dentro de estos días",
           "lock_minutes_before_checkin": "Cerradura activa N minutos ANTES del check-in",
           "lock_minutes_after_checkout": "Cerradura activa N minutos DESPUÉS del check-out",
           "lock_trigger_source": "Fuente del evento de cerradura",

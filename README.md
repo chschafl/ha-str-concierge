@@ -34,7 +34,7 @@ No more programming door codes by hand. No more forgetting to reset the thermost
 
 Out of the box you get:
 
-- **A "Guest Status" sensor** — `reserved` (booked, not here yet) → `due_in` (arriving soon) → `in_house` (currently here) → `departed` (just checked out) → `vacant` (no future bookings at all). As soon as a guest goes `departed`, the next booking shows up — even if it's months away — so you always know who's coming.
+- **A "Guest Status" sensor** — `reserved` (booked, not here yet) → `due_in` (arriving soon) → `in_house` (currently here) → `departed` (just checked out) → `vacant` (no booking within the next *N* days — *N* is configurable, default 30). As soon as a guest goes `departed`, the next booking inside the threshold shows up so you always know who's coming.
 - **A "House State" sensor** — `ready` for the next guest, `occupied`, `dirty` (needs cleaning), `cleaning` (cleaner is on it)
 - **Current guest info** — name, check-in / check-out times, door code, calculated lock-access window
 - **Buttons for the cleaner** — "Mark Cleaning Started" and "Mark Ready" go right on a dashboard or HA mobile app
@@ -106,7 +106,8 @@ Open the integration's **Configure** panel any time after setup:
 
 | Option | What it does |
 |---|---|
-| **Arrival window** (default: 4 hours) | How long before check-in time the guest status flips from `reserved` to `due_in` |
+| **Arrival window** (minutes, default: 240) | How long before check-in time the guest status flips from `reserved` to `due_in` |
+| **Vacancy threshold** (days, default: 30) | The next booking only shows up once it's within this many days. Anything further out leaves the integration in `vacant`. Also sets how far the provider fetches |
 | **Lock minutes before check-in** (default: 0) | How early the door code becomes valid |
 | **Lock minutes after check-out** (default: 60) | Courtesy window after checkout before the guest goes `departed` |
 | **Lock trigger source** (default: **Disabled**) | How STR Concierge detects "guest just entered". **Disabled** (default) means rely on the manual buttons only. Pick **Lock entity** to listen to any HA lock or door sensor, or **Keymaster slot event** if you're using Keymaster |
@@ -160,7 +161,7 @@ The integration is deliberately conservative about state transitions it can't be
 | `reserved` → `due_in` | Automatic (time-based, uses arrival window) |
 | `due_in` → `in_house` | Door-lock event (if a trigger is configured) **or** **Mark Guest Arrived** button |
 | `in_house` → `departed` | Automatic when `now ≥ checkout + courtesy window` **or** **Mark Guest Departed** button |
-| `departed` → next guest / `vacant` | Automatic, 10 seconds after `departed`. Rotates to the next booking if one exists (whether it's in 2 hours or 6 months), else falls through to `vacant` |
+| `departed` → next guest / `vacant` | Automatic, 10 seconds after `departed`. Rotates to the next booking if one exists inside the vacancy threshold; else falls through to `vacant` |
 | House `occupied` → `dirty` | Automatic, the moment the guest goes `departed` |
 | House `dirty` → `cleaning` | Cleaner Keymaster slot PIN (if configured) **or** **Mark Cleaning Started** button |
 | House `cleaning` → `ready` | **Mark Ready** button — always manual |

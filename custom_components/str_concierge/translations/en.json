@@ -39,7 +39,8 @@
         "title": "STR Concierge Options",
         "description": "Tune arrival window, lock-access window, and how the integration detects that a guest has entered the house.",
         "data": {
-          "arrival_window_hours": "Arrival window (hours before check-in)",
+          "arrival_window_minutes": "Arrival window (minutes before check-in)",
+          "vacancy_threshold_days": "Vacancy threshold (days) — show `vacant` when no booking lands within this many days",
           "lock_minutes_before_checkin": "Lock enabled N minutes BEFORE check-in",
           "lock_minutes_after_checkout": "Lock remains active N minutes AFTER check-out",
           "lock_trigger_source": "Lock trigger source",

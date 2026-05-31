@@ -39,7 +39,8 @@
         "title": "STR Concierge Opties",
         "description": "Stel het aankomstvenster, het slot-toegangsvenster en de detectie van gastaankomst in.",
         "data": {
-          "arrival_window_hours": "Aankomstvenster (uren vóór check-in)",
+          "arrival_window_minutes": "Aankomstvenster (minuten vóór check-in)",
+          "vacancy_threshold_days": "Leegstandsdrempel (dagen) — toon `vacant` als er binnen dit aantal dagen geen boeking is",
           "lock_minutes_before_checkin": "Slot actief N minuten VÓÓR check-in",
           "lock_minutes_after_checkout": "Slot actief N minuten NA check-out",
           "lock_trigger_source": "Triggerbron voor slot",

@@ -11,7 +11,8 @@ CONF_PROPERTY_ID = "property_id"
 CONF_POLL_INTERVAL = "poll_interval"
 
 # ── Options keys (editable after setup) ───────────────────────────────
-CONF_ARRIVAL_WINDOW_HOURS = "arrival_window_hours"
+CONF_ARRIVAL_WINDOW_MINUTES = "arrival_window_minutes"
+CONF_VACANCY_THRESHOLD_DAYS = "vacancy_threshold_days"
 CONF_LOCK_MINUTES_BEFORE_CHECKIN = "lock_minutes_before_checkin"
 CONF_LOCK_MINUTES_AFTER_CHECKOUT = "lock_minutes_after_checkout"
 CONF_LOCK_TRIGGER_SOURCE = "lock_trigger_source"
@@ -39,7 +40,8 @@ PROVIDER_OPTIONS = [
 
 # ── Defaults ──────────────────────────────────────────────────────────
 DEFAULT_POLL_INTERVAL = 300  # 5 minutes
-DEFAULT_ARRIVAL_WINDOW_HOURS = 4
+DEFAULT_ARRIVAL_WINDOW_MINUTES = 240   # 4 hours — units now match the lock-window options
+DEFAULT_VACANCY_THRESHOLD_DAYS = 30    # Vacant when no booking lands within this many days
 DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN = 0
 DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT = 60
 DEFAULT_LOCK_UNLOCK_STATES = ["unlocked"]

@@ -121,7 +121,8 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         property_id: str,
         poll_interval: int,
         entry_id: str,
-        arrival_window_hours: int,
+        arrival_window_minutes: int,
+        vacancy_threshold_days: int,
         lock_minutes_before_checkin: int,
         lock_minutes_after_checkout: int,
     ) -> None:
@@ -134,7 +135,8 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         self._provider = provider
         self._property_id = property_id
         self._entry_id = entry_id
-        self._arrival_window = timedelta(hours=arrival_window_hours)
+        self._arrival_window = timedelta(minutes=arrival_window_minutes)
+        self._vacancy_threshold = timedelta(days=vacancy_threshold_days)
         self._lock_before = timedelta(minutes=lock_minutes_before_checkin)
         self._lock_after = timedelta(minutes=lock_minutes_after_checkout)
 
@@ -352,15 +354,23 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         )
 
     def _promote_upcoming(self, pd: PropertyData) -> PropertyData:
-        """Surface the next booking as `current` whenever there's no real current.
+        """Surface the next booking as `current` whenever there's no real current,
+        unless it's beyond the user's vacancy threshold.
 
-        We want hosts to always see who's coming next — even if the next booking
-        is months away. Status derivation will report `reserved` (far in the
-        future) or `due_in` (inside the arrival window) based on time-to-checkin.
-        `vacant` is reserved for the genuine "nobody booked, period" case.
+        Status derivation reports `reserved` (far in the future, but inside the
+        threshold) or `due_in` (inside the arrival window). `vacant` means there
+        is no booking inside the vacancy threshold.
         """
         if pd.current_guest is not None or pd.next_guest is None:
             return pd
+        if _now_utc() + self._vacancy_threshold < pd.next_guest.checkin:
+            # Next booking exists but is beyond the threshold — stay vacant.
+            return PropertyData(
+                property_id=pd.property_id,
+                property_name=pd.property_name,
+                current_guest=None,
+                next_guest=None,
+            )
         return PropertyData(
             property_id=pd.property_id,
             property_name=pd.property_name,

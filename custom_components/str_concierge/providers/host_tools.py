@@ -47,11 +47,8 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://app.hosttools.com/api"
 
-# Reservation look-ahead. Captures a still-active checkout from earlier today
-# plus everything booked for the next ~3 months — enough for `current` and
-# `next` derivation without pulling the whole calendar.
+# Captures a still-active checkout from earlier today.
 LOOKBACK = timedelta(days=1)
-LOOKAHEAD = timedelta(days=90)
 
 ACTIVE_STATUSES = {"accepted", "confirmed", "pending", "inquiry"}
 SKIP_STATUSES = {"cancelled", "canceled", "declined", "blocked"}
@@ -93,8 +90,14 @@ def _ymd(dt: datetime) -> str:
 class HostToolsProvider(STRProvider):
     """Provider backed by the Host Tools public API."""
 
-    def __init__(self, api_key: str, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str | None = None,
+        lookahead_days: int = 30,
+    ) -> None:
         super().__init__(api_key, base_url or BASE_URL)
+        self._lookahead = timedelta(days=lookahead_days)
 
     # ── HTTP ──────────────────────────────────────────────────────────
 
@@ -130,7 +133,7 @@ class HostToolsProvider(STRProvider):
     async def get_property_data(self, property_id: str) -> PropertyData:
         now = datetime.now(timezone.utc)
         start = _ymd(now - LOOKBACK)
-        end = _ymd(now + LOOKAHEAD)
+        end = _ymd(now + self._lookahead)
         data = await self._get(f"/getReservations/{property_id}/{start}/{end}")
 
         items = (

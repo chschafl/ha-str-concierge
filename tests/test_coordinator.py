@@ -38,7 +38,8 @@ def coordinator(hass, mock_provider):
         property_id="prop-001",
         poll_interval=300,
         entry_id="test-entry",
-        arrival_window_hours=4,
+        arrival_window_minutes=240,
+        vacancy_threshold_days=30,
         lock_minutes_before_checkin=0,
         lock_minutes_after_checkout=60,
     )
@@ -145,15 +146,15 @@ class TestGuestStateDerivation:
         assert coordinator.data.current_guest.name == "Kaite Sambrook"
         assert coordinator.data.guest_status == GUEST_DUE_IN
 
-    async def test_next_guest_promoted_even_when_far_in_future(
+    async def test_next_guest_promoted_within_vacancy_threshold(
         self, coordinator, mock_provider
     ):
-        """Hosts always want to see who's coming next, even months away.
-        We promote next → current and report `reserved`, not `vacant`."""
+        """Hosts always want to see who's coming next — as long as they're
+        inside the vacancy threshold (default 30 days)."""
         upcoming = Guest(
             booking_id="booking-NEXT",
             name="Kaite Sambrook",
-            checkin=_utc(2025, 6, 5, hour=15),   # check-in 4+ days away
+            checkin=_utc(2025, 6, 5, hour=15),   # 4+ days out, well within 30
             checkout=_utc(2025, 6, 7, hour=11),
         )
         mock_provider.get_property_data.return_value = PropertyData(
@@ -166,6 +167,27 @@ class TestGuestStateDerivation:
         assert coordinator.data.current_guest is not None
         assert coordinator.data.current_guest.name == "Kaite Sambrook"
         assert coordinator.data.guest_status == GUEST_RESERVED
+
+    async def test_vacant_when_next_guest_beyond_vacancy_threshold(
+        self, coordinator, mock_provider
+    ):
+        """A booking past the vacancy threshold (default 30 days) must NOT
+        be promoted — status stays vacant until it gets closer."""
+        far_off = Guest(
+            booking_id="booking-FAR",
+            name="Future Guest",
+            checkin=_utc(2025, 12, 1, hour=15),   # 6+ months out
+            checkout=_utc(2025, 12, 5, hour=11),
+        )
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=far_off,
+        )
+        await _tick(coordinator, _utc(2025, 6, 1, hour=12))
+        assert coordinator.data.current_guest is None
+        assert coordinator.data.guest_status == GUEST_VACANT
 
 
 class TestHouseState:

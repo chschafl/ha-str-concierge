@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..const import (
+    DEFAULT_VACANCY_THRESHOLD_DAYS,
     PROVIDER_CUSTOM,
     PROVIDER_GUESTY,
     PROVIDER_HOST_TOOLS,
@@ -19,16 +20,22 @@ def create_provider(
     provider_type: str,
     api_key: str,
     base_url: str | None = None,
+    lookahead_days: int = DEFAULT_VACANCY_THRESHOLD_DAYS,
 ) -> STRProvider:
-    """Instantiate the correct provider for the given type."""
+    """Instantiate the correct provider for the given type.
+
+    ``lookahead_days`` is how far into the future the provider should fetch
+    reservations. Match this to the coordinator's vacancy threshold so the
+    integration only ever sees bookings it might surface.
+    """
     if provider_type == PROVIDER_HOST_TOOLS:
-        return HostToolsProvider(api_key, base_url)
+        return HostToolsProvider(api_key, base_url, lookahead_days=lookahead_days)
     if provider_type == PROVIDER_CUSTOM:
         if not base_url:
             raise ValueError("Custom endpoint provider requires a base_url")
         return CustomEndpointProvider(api_key, base_url)
     if provider_type == PROVIDER_HOSTFULLY:
-        return HostfullyProvider(api_key, base_url)
+        return HostfullyProvider(api_key, base_url, lookahead_days=lookahead_days)
     if provider_type == PROVIDER_GUESTY:
-        return GuestyProvider(api_key, base_url)
+        return GuestyProvider(api_key, base_url, lookahead_days=lookahead_days)
     raise ValueError(f"Unknown provider type: {provider_type}")
