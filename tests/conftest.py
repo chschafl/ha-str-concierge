@@ -1,58 +1,55 @@
-"""Shared pytest fixtures for STR HA tests."""
+"""Shared pytest fixtures for STR Concierge tests."""
 from __future__ import annotations
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.str_ha.const import (
+from custom_components.str_concierge.const import (
     CONF_API_KEY,
+    CONF_ARRIVAL_WINDOW_MINUTES,
+    CONF_LOCK_MINUTES_AFTER_CHECKOUT,
+    CONF_LOCK_MINUTES_BEFORE_CHECKIN,
     CONF_POLL_INTERVAL,
-    CONF_PROPERTY_IDS,
+    CONF_PROPERTY_ID,
     CONF_PROVIDER,
-    DEFAULT_CHECKIN_OFFSET_MINUTES,
-    DEFAULT_CHECKOUT_OFFSET_MINUTES,
-    CONF_CHECKIN_OFFSET_MINUTES,
-    CONF_CHECKOUT_OFFSET_MINUTES,
+    CONF_VACANCY_THRESHOLD_DAYS,
+    DEFAULT_ARRIVAL_WINDOW_MINUTES,
+    DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
+    DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
+    DEFAULT_VACANCY_THRESHOLD_DAYS,
     DOMAIN,
-    PROVIDER_HOST_TOOLS,
     PROVIDER_CUSTOM,
+    PROVIDER_HOST_TOOLS,
 )
-from custom_components.str_ha.providers.base import Guest, Property, PropertyData
-
+from custom_components.str_concierge.providers.base import Guest, Property, PropertyData
 
 # ── Datetime helpers ──────────────────────────────────────────────────
 
 def dt(iso: str) -> datetime:
-    return datetime.fromisoformat(iso).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(iso).replace(tzinfo=UTC)
 
 
-# ── Sample data ──────────────────────────────────────────────────
+# ── Sample data ───────────────────────────────────────────────────────
 
 CURRENT_GUEST = Guest(
     booking_id="booking-001",
     name="Alice Smith",
-    phone="+1-555-0100",
-    email="alice@example.com",
     checkin=dt("2025-06-01T15:00:00"),
     checkout=dt("2025-06-07T11:00:00"),
     door_code="1234",
-    status="confirmed",
 )
 
 NEXT_GUEST = Guest(
     booking_id="booking-002",
     name="Bob Jones",
-    phone="+1-555-0200",
-    email="bob@example.com",
     checkin=dt("2025-06-08T15:00:00"),
     checkout=dt("2025-06-10T11:00:00"),
     door_code="5678",
-    status="confirmed",
 )
 
 SAMPLE_PROPERTY = Property(id="prop-001", name="Beach House")
@@ -65,7 +62,7 @@ SAMPLE_PROPERTY_DATA = PropertyData(
 )
 
 
-# ── Config entry fixtures ───────────────────────────────────────────────
+# ── Config entry fixtures ─────────────────────────────────────────────
 
 @pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
@@ -75,12 +72,14 @@ def mock_config_entry() -> MockConfigEntry:
         data={
             CONF_PROVIDER: PROVIDER_HOST_TOOLS,
             CONF_API_KEY: "test-api-key",
-            CONF_PROPERTY_IDS: ["prop-001"],
+            CONF_PROPERTY_ID: "prop-001",
             CONF_POLL_INTERVAL: 300,
         },
         options={
-            CONF_CHECKIN_OFFSET_MINUTES: DEFAULT_CHECKIN_OFFSET_MINUTES,
-            CONF_CHECKOUT_OFFSET_MINUTES: DEFAULT_CHECKOUT_OFFSET_MINUTES,
+            CONF_ARRIVAL_WINDOW_MINUTES: DEFAULT_ARRIVAL_WINDOW_MINUTES,
+            CONF_VACANCY_THRESHOLD_DAYS: DEFAULT_VACANCY_THRESHOLD_DAYS,
+            CONF_LOCK_MINUTES_BEFORE_CHECKIN: DEFAULT_LOCK_MINUTES_BEFORE_CHECKIN,
+            CONF_LOCK_MINUTES_AFTER_CHECKOUT: DEFAULT_LOCK_MINUTES_AFTER_CHECKOUT,
         },
     )
 
@@ -94,17 +93,19 @@ def mock_custom_entry() -> MockConfigEntry:
             CONF_PROVIDER: PROVIDER_CUSTOM,
             CONF_API_KEY: "test-token",
             "base_url": "https://my-backend.example.com/api",
-            CONF_PROPERTY_IDS: ["prop-001"],
+            CONF_PROPERTY_ID: "prop-001",
             CONF_POLL_INTERVAL: 300,
         },
         options={
-            CONF_CHECKIN_OFFSET_MINUTES: 60,
-            CONF_CHECKOUT_OFFSET_MINUTES: 60,
+            CONF_ARRIVAL_WINDOW_MINUTES: 240,
+            CONF_VACANCY_THRESHOLD_DAYS: 30,
+            CONF_LOCK_MINUTES_BEFORE_CHECKIN: 60,
+            CONF_LOCK_MINUTES_AFTER_CHECKOUT: 60,
         },
     )
 
 
-# ── Provider mock ───────────────────────────────────────────────────
+# ── Provider mock ─────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_provider():

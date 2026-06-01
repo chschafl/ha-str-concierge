@@ -1,0 +1,115 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "STR Concierge",
+        "description": "Wähle das Property-Management-System aus, mit dem du dich verbinden möchtest.",
+        "data": {
+          "provider": "Backend-Anbieter"
+        }
+      },
+      "credentials": {
+        "title": "API-Zugangsdaten",
+        "description": "Gib deine API-Zugangsdaten ein. {api_key_hint}",
+        "data": {
+          "api_key": "API-Schlüssel / Token",
+          "base_url": "Basis-URL"
+        }
+      },
+      "property": {
+        "title": "Unterkunft auswählen",
+        "description": "Wähle die Unterkunft aus, die mit dieser Integration verwaltet werden soll. Lege das Abrufintervall in Sekunden fest.",
+        "data": {
+          "property_id": "Unterkunft",
+          "poll_interval": "Abrufintervall (Sekunden)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Anbieter fehlgeschlagen. Prüfe deine Zugangsdaten und Netzwerkverbindung."
+    },
+    "abort": {
+      "no_properties": "Für dieses Konto wurden keine Unterkünfte gefunden.",
+      "already_configured": "Dieses Konto ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "STR Concierge Optionen",
+        "description": "Stelle das Ankunftsfenster, das Türschloss-Zugangsfenster und die Erkennung des Gasteinzugs ein.",
+        "data": {
+          "arrival_window_minutes": "Ankunftsfenster (Minuten vor Check-in)",
+          "vacancy_threshold_days": "Leerstandsschwelle (Tage) — `vacant`, wenn innerhalb dieser Tage keine Buchung liegt",
+          "lock_minutes_before_checkin": "Schloss aktiv N Minuten VOR Check-in",
+          "lock_minutes_after_checkout": "Schloss aktiv N Minuten NACH Check-out",
+          "lock_trigger_source": "Türschloss-Auslöser",
+          "lock_entity_id": "Türschloss-Entität (z. B. lock.haustuer)",
+          "lock_unlock_states": "Zustände, die als „aufgeschlossen“ gelten (kommagetrennt)",
+          "keymaster_slot": "Keymaster Code-Slot Name (Gast-Ankunft)",
+          "cleaner_keymaster_slot": "Keymaster Code-Slot Name (Reinigungskraft)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "guest": {
+        "name": "Gast"
+      },
+      "door_code": {
+        "name": "Türcode"
+      },
+      "guest_status": {
+        "name": "Gast-Status",
+        "state": {
+          "reserved": "Reserviert",
+          "due_in": "Anreise erwartet",
+          "in_house": "Im Haus",
+          "departed": "Abgereist",
+          "vacant": "Frei"
+        }
+      },
+      "house_state": {
+        "name": "Haus-Status",
+        "state": {
+          "ready": "Bereit",
+          "occupied": "Belegt",
+          "dirty": "Reinigung nötig",
+          "cleaning": "Wird gereinigt"
+        }
+      },
+      "checkin": {
+        "name": "Check-in"
+      },
+      "checkout": {
+        "name": "Check-out"
+      },
+      "lock_access_start": {
+        "name": "Schloss-Zugang Start"
+      },
+      "lock_access_end": {
+        "name": "Schloss-Zugang Ende"
+      }
+    },
+    "binary_sensor": {
+      "guest_present": {
+        "name": "Gast anwesend"
+      }
+    },
+    "button": {
+      "mark_arrived": {
+        "name": "Gast als angekommen markieren"
+      },
+      "mark_departed": {
+        "name": "Gast als abgereist markieren"
+      },
+      "mark_cleaning_started": {
+        "name": "Reinigung gestartet"
+      },
+      "mark_ready": {
+        "name": "Haus bereit markieren"
+      }
+    }
+  }
+}

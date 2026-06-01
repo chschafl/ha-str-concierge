@@ -1,0 +1,13 @@
+{
+  "domain": "str_concierge",
+  "name": "STR Concierge",
+  "after_dependencies": [],
+  "codeowners": ["@chschafl"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/chschafl/ha-str-concierge",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/chschafl/ha-str-concierge/issues",
+  "requirements": ["aiohttp>=3.9.0"],
+  "version": "0.1.0"
+}

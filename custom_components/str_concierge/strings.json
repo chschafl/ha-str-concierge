@@ -1,0 +1,115 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "STR Concierge",
+        "description": "Choose the property management system to connect to.",
+        "data": {
+          "provider": "Backend Provider"
+        }
+      },
+      "credentials": {
+        "title": "API Credentials",
+        "description": "Enter your API credentials. {api_key_hint}",
+        "data": {
+          "api_key": "API Key / Token",
+          "base_url": "Base URL"
+        }
+      },
+      "property": {
+        "title": "Select Property",
+        "description": "Choose the property to manage with this integration. Set the polling interval in seconds.",
+        "data": {
+          "property_id": "Property",
+          "poll_interval": "Polling Interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the provider. Check your credentials and network."
+    },
+    "abort": {
+      "no_properties": "No properties were found for this account.",
+      "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "STR Concierge Options",
+        "description": "Tune arrival window, lock-access window, and how the integration detects that a guest has entered the house.",
+        "data": {
+          "arrival_window_minutes": "Arrival window (minutes before check-in)",
+          "vacancy_threshold_days": "Vacancy threshold (days) — show `vacant` when no booking lands within this many days",
+          "lock_minutes_before_checkin": "Lock enabled N minutes BEFORE check-in",
+          "lock_minutes_after_checkout": "Lock remains active N minutes AFTER check-out",
+          "lock_trigger_source": "Lock trigger source",
+          "lock_entity_id": "Lock entity ID (e.g. lock.front_door)",
+          "lock_unlock_states": "States that count as 'unlocked' (comma-separated)",
+          "keymaster_slot": "Keymaster code slot name (guest arrival)",
+          "cleaner_keymaster_slot": "Keymaster code slot name (cleaner arrival)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "guest": {
+        "name": "Guest"
+      },
+      "door_code": {
+        "name": "Door code"
+      },
+      "guest_status": {
+        "name": "Guest status",
+        "state": {
+          "reserved": "Reserved",
+          "due_in": "Due in",
+          "in_house": "In house",
+          "departed": "Departed",
+          "vacant": "Vacant"
+        }
+      },
+      "house_state": {
+        "name": "House state",
+        "state": {
+          "ready": "Ready",
+          "occupied": "Occupied",
+          "dirty": "Needs cleaning",
+          "cleaning": "Cleaning"
+        }
+      },
+      "checkin": {
+        "name": "Check-in"
+      },
+      "checkout": {
+        "name": "Check-out"
+      },
+      "lock_access_start": {
+        "name": "Lock access start"
+      },
+      "lock_access_end": {
+        "name": "Lock access end"
+      }
+    },
+    "binary_sensor": {
+      "guest_present": {
+        "name": "Guest present"
+      }
+    },
+    "button": {
+      "mark_arrived": {
+        "name": "Mark guest arrived"
+      },
+      "mark_departed": {
+        "name": "Mark guest departed"
+      },
+      "mark_cleaning_started": {
+        "name": "Mark cleaning started"
+      },
+      "mark_ready": {
+        "name": "Mark house ready"
+      }
+    }
+  }
+}

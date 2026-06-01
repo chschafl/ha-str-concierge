@@ -1,15 +1,13 @@
 """Tests for the base data models and _pick_current_and_next logic."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-import pytest
-
-from custom_components.str_ha.providers.base import Guest, PropertyData, STRProvider
+from custom_components.str_concierge.providers.base import Guest, PropertyData, STRProvider
 
 
 def _guest(booking_id: str, offset_hours_start: int, offset_hours_end: int) -> Guest:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return Guest(
         booking_id=booking_id,
         name=f"Guest {booking_id}",
@@ -44,15 +42,3 @@ class TestPickCurrentAndNext:
         assert pd.next_guest is None
 
 
-class TestGuestIsActive:
-    def test_active_within_window(self):
-        g = _guest("x", -1, 1)
-        assert g.is_active is True
-
-    def test_not_active_before_checkin(self):
-        g = _guest("x", 1, 5)
-        assert g.is_active is False
-
-    def test_not_active_after_checkout(self):
-        g = _guest("x", -5, -1)
-        assert g.is_active is False

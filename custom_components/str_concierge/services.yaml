@@ -1,0 +1,24 @@
+sync_keymaster:
+  name: Sync Keymaster Slot
+  description: >
+    Write the current guest's door code and lock-access window to a
+    Keymaster code slot. Window is taken from the coordinator's derived
+    lock_access_start / lock_access_end (already includes the configured
+    minutes-before-checkin and minutes-after-checkout offsets).
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID of the STR Concierge integration instance.
+      required: true
+      example: "abc123def456"
+      selector:
+        text:
+    slot:
+      name: Keymaster Slot Name
+      description: >
+        The code slot name used in Keymaster entity IDs, e.g. "str_guest"
+        maps to input_text.keymaster_str_guest_pin.
+      required: true
+      example: "str_guest"
+      selector:
+        text:

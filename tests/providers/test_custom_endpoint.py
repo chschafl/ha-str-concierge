@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from aioresponses import aioresponses
 
-from custom_components.str_ha.providers.custom_endpoint import CustomEndpointProvider
+from custom_components.str_concierge.providers.custom_endpoint import CustomEndpointProvider
 
 BASE = "https://my-api.example.com/api"
 
@@ -14,8 +14,6 @@ RESERVATIONS_RESPONSE = [
     {
         "id": "r1",
         "guestName": "Dana",
-        "guestEmail": "dana@example.com",
-        "guestPhone": "+1-555-1111",
         "checkIn": "2025-06-01T14:00:00Z",
         "checkOut": "2099-12-31T10:00:00Z",
         "doorCode": "4321",
@@ -39,22 +37,44 @@ class TestCustomEndpoint:
 
     async def test_get_property_data(self, provider):
         with aioresponses() as m:
-            m.get(f"{BASE}/reservations", payload=RESERVATIONS_RESPONSE)
+            m.get(
+                f"{BASE}/properties/p1/reservations",
+                payload=RESERVATIONS_RESPONSE,
+            )
             data = await provider.get_property_data("p1")
         assert data.current_guest.name == "Dana"
         assert data.current_guest.door_code == "4321"
 
     async def test_mark_arrive(self, provider):
         with aioresponses() as m:
-            m.post(f"{BASE}/reservations/r1/arrive", payload={"ok": True})
+            # mark_arrived needs the property_id, which is stashed by the
+            # first get_property_data call.
+            m.get(f"{BASE}/properties/p1/reservations", payload=[])
+            m.post(
+                f"{BASE}/properties/p1/reservations/r1/arrive",
+                payload={"ok": True},
+            )
+            await provider.get_property_data("p1")
             result = await provider.mark_arrived("r1")
         assert result is True
 
     async def test_mark_checkout(self, provider):
         with aioresponses() as m:
-            m.post(f"{BASE}/reservations/r1/checkout", payload={"ok": True})
+            m.get(f"{BASE}/properties/p1/reservations", payload=[])
+            m.post(
+                f"{BASE}/properties/p1/reservations/r1/checkout",
+                payload={"ok": True},
+            )
+            await provider.get_property_data("p1")
             result = await provider.mark_checked_out("r1")
         assert result is True
+
+    async def test_mark_actions_fail_before_property_known(self, provider):
+        """Defensive: don't blindly POST without a property_id."""
+        with pytest.raises(RuntimeError, match="property_id"):
+            await provider.mark_arrived("r1")
+        with pytest.raises(RuntimeError, match="property_id"):
+            await provider.mark_checked_out("r1")
 
     async def test_trailing_slash_stripped(self):
         p = CustomEndpointProvider(api_key="t", base_url=f"{BASE}/")

@@ -1,0 +1,115 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "STR Concierge",
+        "description": "Elige el sistema de gestión de propiedades al que conectarte.",
+        "data": {
+          "provider": "Proveedor"
+        }
+      },
+      "credentials": {
+        "title": "Credenciales de la API",
+        "description": "Introduce tus credenciales de la API. {api_key_hint}",
+        "data": {
+          "api_key": "Clave / Token de API",
+          "base_url": "URL base"
+        }
+      },
+      "property": {
+        "title": "Selecciona la propiedad",
+        "description": "Elige la propiedad que esta integración gestionará. Establece el intervalo de sondeo en segundos.",
+        "data": {
+          "property_id": "Propiedad",
+          "poll_interval": "Intervalo de sondeo (segundos)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No se puede conectar con el proveedor. Verifica tus credenciales y tu red."
+    },
+    "abort": {
+      "no_properties": "No se encontraron propiedades para esta cuenta.",
+      "already_configured": "Esta cuenta ya está configurada."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de STR Concierge",
+        "description": "Ajusta la ventana de llegada, la ventana de acceso a la cerradura y cómo se detecta que el huésped ha entrado en la casa.",
+        "data": {
+          "arrival_window_minutes": "Ventana de llegada (minutos antes del check-in)",
+          "vacancy_threshold_days": "Umbral de vacante (días) — mostrar `vacant` cuando no haya reservas dentro de estos días",
+          "lock_minutes_before_checkin": "Cerradura activa N minutos ANTES del check-in",
+          "lock_minutes_after_checkout": "Cerradura activa N minutos DESPUÉS del check-out",
+          "lock_trigger_source": "Fuente del evento de cerradura",
+          "lock_entity_id": "ID de la entidad de cerradura (p. ej. lock.puerta_principal)",
+          "lock_unlock_states": "Estados que cuentan como «desbloqueado» (separados por comas)",
+          "keymaster_slot": "Slot de Keymaster (llegada del huésped)",
+          "cleaner_keymaster_slot": "Slot de Keymaster (llegada del personal de limpieza)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "guest": {
+        "name": "Huésped"
+      },
+      "door_code": {
+        "name": "Código de puerta"
+      },
+      "guest_status": {
+        "name": "Estado del huésped",
+        "state": {
+          "reserved": "Reservado",
+          "due_in": "Próxima llegada",
+          "in_house": "En la casa",
+          "departed": "Salido",
+          "vacant": "Libre"
+        }
+      },
+      "house_state": {
+        "name": "Estado de la casa",
+        "state": {
+          "ready": "Lista",
+          "occupied": "Ocupada",
+          "dirty": "Necesita limpieza",
+          "cleaning": "Limpiando"
+        }
+      },
+      "checkin": {
+        "name": "Check-in"
+      },
+      "checkout": {
+        "name": "Check-out"
+      },
+      "lock_access_start": {
+        "name": "Inicio de acceso a la cerradura"
+      },
+      "lock_access_end": {
+        "name": "Fin de acceso a la cerradura"
+      }
+    },
+    "binary_sensor": {
+      "guest_present": {
+        "name": "Huésped presente"
+      }
+    },
+    "button": {
+      "mark_arrived": {
+        "name": "Marcar huésped como llegado"
+      },
+      "mark_departed": {
+        "name": "Marcar huésped como salido"
+      },
+      "mark_cleaning_started": {
+        "name": "Marcar inicio de limpieza"
+      },
+      "mark_ready": {
+        "name": "Marcar casa como lista"
+      }
+    }
+  }
+}
