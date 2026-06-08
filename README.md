@@ -135,11 +135,12 @@ The integration creates a single **device** per property, with these entities gr
 | **Lock Access Start** | check-in − "lock minutes before" |
 | **Lock Access End** | check-out + "lock minutes after" |
 
-### Binary sensor
+### Binary sensors
 
 | Entity | `on` when |
 |---|---|
 | **Guest Present** | Guest Status is `in_house` |
+| **Lock Active** | `now` is inside the lock-access window (`Lock Access Start ≤ now ≤ Lock Access End`). Use this to gate when a door code / Z-Wave key slot should be enabled. `off` whenever the house is `vacant`. |
 
 ### Buttons
 
@@ -382,6 +383,92 @@ data:
   entry_id: "your_config_entry_id"   # find this in Settings → Devices & Services
   slot: "str_guest"
 ```
+
+---
+
+## Driving a Z-Wave lock directly (no Keymaster)
+
+If you don't use Keymaster but your lock is exposed through the Z-Wave JS integration (e.g. a Yale, Schlage Connect, or Kwikset Z-Wave smart lock), you can write the guest's PIN straight into a user-code slot and gate it on the `Lock Active` binary sensor — `on` while the lock-access window is open, `off` otherwise.
+
+The two services involved come from Z-Wave JS:
+
+- `zwave_js.set_lock_usercode` — write a PIN into a numbered slot
+- `zwave_js.clear_lock_usercode` — erase the PIN from that slot
+
+This recipe uses **slot 2** as the dedicated "current STR guest" slot. Pick any slot number that's free on your lock; slot 1 is usually reserved for the owner's master code.
+
+**Step 1 — Push the new guest's PIN into slot 2 when the booking rotates.**
+
+```yaml
+automation:
+  alias: "STR – Z-Wave: write guest code on booking change"
+  trigger:
+    - platform: event
+      event_type: str_concierge_guest_changed
+  condition:
+    # Only write a PIN when there's actually a guest (skip rotations to vacant)
+    - condition: template
+      value_template: "{{ trigger.event.data.current_guest_id is not none }}"
+    - condition: template
+      value_template: "{{ states('sensor.beach_house_door_code') not in ('unknown', 'unavailable', '') }}"
+  action:
+    - service: zwave_js.set_lock_usercode
+      target:
+        entity_id: lock.front_door
+      data:
+        code_slot: 2
+        usercode: "{{ states('sensor.beach_house_door_code') }}"
+```
+
+**Step 2 — Activate the slot only inside the lock-access window.**
+
+The `Lock Active` binary sensor flips `on` at `Lock Access Start` (check-in − `lock_minutes_before_checkin`) and `off` again at `Lock Access End` (check-out + `lock_minutes_after_checkout`). Drive the user-code in/out on those edges:
+
+```yaml
+automation:
+  alias: "STR – Z-Wave: enable code at start of access window"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.beach_house_lock_active
+      to: "on"
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.beach_house_door_code') not in ('unknown', 'unavailable', '') }}"
+  action:
+    - service: zwave_js.set_lock_usercode
+      target:
+        entity_id: lock.front_door
+      data:
+        code_slot: 2
+        usercode: "{{ states('sensor.beach_house_door_code') }}"
+
+automation:
+  alias: "STR – Z-Wave: clear code at end of access window"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.beach_house_lock_active
+      to: "off"
+  action:
+    - service: zwave_js.clear_lock_usercode
+      target:
+        entity_id: lock.front_door
+      data:
+        code_slot: 2
+    - service: lock.lock
+      target:
+        entity_id: lock.front_door
+```
+
+What you get end-to-end:
+
+1. A new booking rotates in → the PIN is written into slot 2 (it's installed but the window may not be open yet).
+2. `Lock Access Start` arrives → `binary_sensor.beach_house_lock_active` flips `on` → the PIN is (re-)written and now actively opens the door.
+3. The guest unlocks with that PIN — if you've wired `Lock entity ID` to `lock.front_door` in the **Configure** panel, that unlock event also flips Guest Status to `in_house`.
+4. `Lock Access End` arrives → `binary_sensor.beach_house_lock_active` flips `off` → the slot is cleared and the door is relocked. The PIN no longer works.
+
+> **Tip.** Writing the same PIN twice (once on `guest_changed`, once on lock-active `on`) is idempotent and intentional — it covers both the "booking rotates while the window is already open" case and the normal "booking arrives hours before check-in" case without you having to think about which one fired first.
+
+> **Caveat.** Some Z-Wave locks reject 4-digit PINs that start with `0`, or require exactly N digits. If your PMS-supplied door code doesn't match what your lock accepts, normalise it in the template (`{{ states('sensor.beach_house_door_code') | string | int }}` or a fixed-width pad) before writing.
 
 ---
 
