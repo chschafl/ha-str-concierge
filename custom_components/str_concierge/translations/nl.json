@@ -95,6 +95,9 @@
     "binary_sensor": {
       "guest_present": {
         "name": "Gast aanwezig"
+      },
+      "lock_active": {
+        "name": "Slot actief"
       }
     },
     "button": {

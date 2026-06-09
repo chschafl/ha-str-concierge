@@ -95,6 +95,9 @@
     "binary_sensor": {
       "guest_present": {
         "name": "Gast anwesend"
+      },
+      "lock_active": {
+        "name": "Schloss aktiv"
       }
     },
     "button": {
