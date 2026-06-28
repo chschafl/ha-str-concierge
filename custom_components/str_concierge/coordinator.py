@@ -305,6 +305,13 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         # by promoting the next booking into the current slot.
         pd = self._apply_dismissal(pd)
 
+        # Keep the previous current guest in the current slot while we're
+        # still inside the post-checkout grace window. PMS providers drop a
+        # booking the instant checkout passes; without this, the door code
+        # (and every other guest-derived field) would flip to the next guest
+        # immediately at checkout time.
+        pd = self._apply_checkout_grace(pd)
+
         # Promote next_guest → current_guest when their arrival window has
         # opened but the PMS hasn't started the booking yet (PMS only marks
         # a booking "current" between checkin and checkout). Without this,
@@ -360,6 +367,35 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
             property_name=pd.property_name,
             current_guest=pd.next_guest,
             next_guest=None,
+        )
+
+    def _apply_checkout_grace(self, pd: PropertyData) -> PropertyData:
+        """Restore the previous current guest while we're still inside their
+        post-checkout grace window (`lock_minutes_after_checkout`).
+
+        If the guest has been latched as arrived (`entered_at` set), keep them
+        in place until the departed → dwell → rotate flow runs; otherwise
+        release them once the grace window elapses.
+        """
+        prev = self.data.current_guest if self.data else None
+        if prev is None:
+            return pd
+        if pd.current_guest is not None and pd.current_guest.booking_id == prev.booking_id:
+            return pd
+        if self._stored.dismissed_booking_id == prev.booking_id:
+            return pd
+        now = _now_utc()
+        # Before checkout the PMS is the source of truth — never override.
+        if now < prev.checkout:
+            return pd
+        grace_end = prev.checkout + self._lock_after
+        if self._stored.entered_at is None and now >= grace_end:
+            return pd
+        return PropertyData(
+            property_id=pd.property_id,
+            property_name=pd.property_name,
+            current_guest=prev,
+            next_guest=pd.current_guest or pd.next_guest,
         )
 
     def _promote_upcoming(self, pd: PropertyData) -> PropertyData:

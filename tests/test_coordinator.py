@@ -1,7 +1,7 @@
 """Tests for STRCoordinator — state derivation, lock latch, departed dwell."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -111,6 +111,57 @@ class TestGuestStateDerivation:
         # Jump past checkout (2025-06-07 11:00) + 60min courtesy.
         await _tick(coordinator, _utc(2025, 6, 7, hour=13))
         assert coordinator.data.guest_status == GUEST_DEPARTED
+
+    async def test_previous_guest_kept_during_checkout_grace(
+        self, coordinator, mock_provider
+    ):
+        """PMS providers drop a booking the instant checkout passes. We hold
+        the previous guest (and their door code) in place until the
+        post-checkout grace window elapses."""
+        # Initial tick: A is current; latch arrival via lock unlock.
+        await _tick(coordinator, _utc(2025, 6, 5))
+        with _at(_utc(2025, 6, 5)):
+            await coordinator.async_handle_lock_unlocked()
+        await _tick(coordinator, _utc(2025, 6, 5))
+
+        # Provider rotates A out — only the next booking is surfaced now.
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=NEXT_GUEST,
+        )
+
+        # A's checkout is 06-07 11:00; lock_after=60 → grace until 12:00.
+        in_grace = _utc(2025, 6, 7, hour=11) + timedelta(minutes=30)
+        await _tick(coordinator, in_grace)
+        assert coordinator.data.current_guest.booking_id == "booking-001"
+        assert coordinator.data.current_guest.door_code == "1234"
+        assert coordinator.data.guest_status == GUEST_IN_HOUSE
+
+    async def test_rotates_to_next_guest_after_grace_ends(
+        self, coordinator, mock_provider
+    ):
+        """Past `checkout + lock_after`, the next guest takes over (here with
+        no lock latch, so the dwell timer isn't involved)."""
+        await _tick(coordinator, _utc(2025, 6, 5))
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=NEXT_GUEST,
+        )
+
+        # During grace: A still current.
+        in_grace = _utc(2025, 6, 7, hour=11) + timedelta(minutes=30)
+        await _tick(coordinator, in_grace)
+        assert coordinator.data.current_guest.booking_id == "booking-001"
+
+        # Past grace: B promoted, door code follows.
+        past_grace = _utc(2025, 6, 7, hour=12) + timedelta(minutes=1)
+        await _tick(coordinator, past_grace)
+        assert coordinator.data.current_guest.booking_id == "booking-002"
+        assert coordinator.data.current_guest.door_code == "5678"
 
     async def test_vacant_when_no_current_guest(self, coordinator, mock_provider):
         mock_provider.get_property_data.return_value = PropertyData(
