@@ -41,4 +41,20 @@ class TestPickCurrentAndNext:
         assert pd.current_guest is None
         assert pd.next_guest is None
 
+    def test_overlapping_active_bookings_pick_earliest_checkin_regardless_of_order(self):
+        """Two bookings can appear simultaneously 'active' for an instant
+        (back-to-back turnover where checkout/checkin tie, or a PMS response
+        re-sorted after a status write). The longest-resident guest — the
+        one who started earliest — must always win, no matter which order
+        the API lists them in."""
+        resident = _guest("resident", -20, 1)  # started 20h ago, ends in 1h
+        arriving = _guest("arriving", -1, 48)  # started 1h ago, long stay
+
+        current, _ = STRProvider._pick_current_and_next([resident, arriving])
+        assert current.booking_id == "resident"
+
+        # Same two bookings, reversed API order — result must be identical.
+        current, _ = STRProvider._pick_current_and_next([arriving, resident])
+        assert current.booking_id == "resident"
+
 

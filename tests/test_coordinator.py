@@ -192,6 +192,35 @@ class TestGuestStateDerivation:
         assert coordinator.data.current_guest.booking_id == "booking-002"
         assert coordinator.data.current_guest.door_code == "5678"
 
+    async def test_arrived_guest_survives_pms_hiccup_before_checkout(
+        self, coordinator, mock_provider
+    ):
+        """Reproduces the reported bug: right after a guest checks in, a
+        transient/reordered PMS response (e.g. immediately after our own
+        `mark_arrived` write) reports the booking as gone and surfaces
+        `next_guest` in its place — mid-stay, well before checkout. The
+        already-arrived guest must not be evicted by a single bad poll."""
+        # Mid-stay: A is current; latch arrival via lock unlock.
+        await _tick(coordinator, _utc(2025, 6, 5))
+        with _at(_utc(2025, 6, 5)):
+            await coordinator.async_handle_lock_unlocked()
+        await _tick(coordinator, _utc(2025, 6, 5))
+        assert coordinator.data.entered_at is not None
+
+        # PMS hiccup: current slot empty, next guest surfaces — well before
+        # A's checkout (2025-06-07 11:00).
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=NEXT_GUEST,
+        )
+        await _tick(coordinator, _utc(2025, 6, 5, hour=18))
+
+        assert coordinator.data.current_guest is not None
+        assert coordinator.data.current_guest.booking_id == CURRENT_GUEST.booking_id
+        assert coordinator.data.guest_status == GUEST_IN_HOUSE
+
     async def test_vacant_when_no_current_guest(self, coordinator, mock_provider):
         mock_provider.get_property_data.return_value = PropertyData(
             property_id="prop-001",

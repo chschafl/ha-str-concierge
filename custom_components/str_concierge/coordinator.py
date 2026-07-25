@@ -385,11 +385,29 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         if self._stored.dismissed_booking_id == prev.booking_id:
             return pd
         now = _now_utc()
-        # Before checkout the PMS is the source of truth — never override.
+        grace_end = prev.checkout + self._lock_after
+
+        # Once a guest has been latched as arrived, hold them in the current
+        # slot for their whole stay plus the checkout grace window. A PMS
+        # hiccup right after we write `mark_arrived` (stale cache, response
+        # re-sorted by "last modified", a momentary empty/partial payload)
+        # must not silently evict a resident guest in favor of `next_guest` —
+        # only the departed → dwell → rotate flow is allowed to do that.
+        if self._stored.entered_at is not None:
+            if now < grace_end:
+                return PropertyData(
+                    property_id=pd.property_id,
+                    property_name=pd.property_name,
+                    current_guest=prev,
+                    next_guest=pd.current_guest or pd.next_guest,
+                )
+            return pd
+
+        # Not yet arrived — the PMS remains the source of truth before
+        # checkout (e.g. a promoted `due_in` booking legitimately replaced).
         if now < prev.checkout:
             return pd
-        grace_end = prev.checkout + self._lock_after
-        if self._stored.entered_at is None and now >= grace_end:
+        if now >= grace_end:
             return pd
         return PropertyData(
             property_id=pd.property_id,

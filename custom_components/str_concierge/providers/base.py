@@ -80,6 +80,13 @@ class STRProvider(ABC):
             elif b.checkin > now:
                 upcoming.append(b)
 
+        # More than one booking can be "active" for an instant — a
+        # back-to-back turnover where checkout/checkin tie, or a PMS that
+        # briefly reports both around a status write. Sort so the guest who
+        # started earliest (i.e. the longest-resident one) wins, instead of
+        # picking list()[0] and letting the choice flip between polls
+        # whenever the PMS reorders its response.
+        active.sort(key=lambda g: g.checkin)
         current = active[0] if active else None
         upcoming.sort(key=lambda g: g.checkin)
         next_guest = upcoming[0] if upcoming else None
