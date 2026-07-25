@@ -249,7 +249,7 @@ If your PMS isn't supported yet, the integration is structured to make adding ne
 
 ## License
 
-MIT © [chschafl](https://github.com/chschafl)
+MIT © [Christian Schafleitner](https://github.com/chschafl)
 
 <!-- Badges -->
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg

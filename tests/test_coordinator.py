@@ -139,6 +139,35 @@ class TestGuestStateDerivation:
         assert coordinator.data.current_guest.door_code == "1234"
         assert coordinator.data.guest_status == GUEST_IN_HOUSE
 
+    async def test_guest_still_shown_45_minutes_after_checkout(
+        self, coordinator, mock_provider
+    ):
+        """Reproduces the reported issue: checkout is 11:00, it's currently
+        11:45 (well inside the 60-minute grace window configured in the
+        `coordinator` fixture) — the checked-out guest must still be shown,
+        not the next guest, even though the PMS has already dropped the
+        booking from `current`."""
+        await _tick(coordinator, _utc(2025, 6, 5))
+
+        # PMS-side checkout has happened: current slot is empty, next guest surfaces.
+        mock_provider.get_property_data.return_value = PropertyData(
+            property_id="prop-001",
+            property_name="Beach House",
+            current_guest=None,
+            next_guest=NEXT_GUEST,
+        )
+
+        # Alice's checkout is 2025-06-07 11:00; it is now 11:45 — 45 minutes
+        # later, still short of the 60-minute grace window.
+        forty_five_min_after_checkout = _utc(2025, 6, 7, hour=11) + timedelta(minutes=45)
+        await _tick(coordinator, forty_five_min_after_checkout)
+
+        assert coordinator.data.current_guest is not None
+        assert coordinator.data.current_guest.booking_id == CURRENT_GUEST.booking_id
+        assert coordinator.data.current_guest.name == CURRENT_GUEST.name
+        assert coordinator.data.current_guest.door_code == CURRENT_GUEST.door_code
+        assert coordinator.data.current_guest.booking_id != NEXT_GUEST.booking_id
+
     async def test_rotates_to_next_guest_after_grace_ends(
         self, coordinator, mock_provider
     ):
