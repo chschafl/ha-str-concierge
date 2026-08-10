@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import re
-from datetime import timezone
+from datetime import UTC
 from zoneinfo import ZoneInfo
 
+import aiohttp
 import pytest
 from aioresponses import aioresponses
 from homeassistant.util import dt as dt_util
@@ -13,7 +14,6 @@ from custom_components.str_concierge.providers.host_tools import (
     BASE_URL,
     HostToolsProvider,
 )
-
 
 # The reservations endpoint embeds dates in the path, so tests match by regex.
 RESERVATIONS_URL_RE = re.compile(
@@ -94,7 +94,7 @@ class TestGetProperties:
     async def test_raises_on_http_error(self, provider):
         with aioresponses() as m:
             m.get(f"{BASE_URL}/getListings", status=401)
-            with pytest.raises(Exception):
+            with pytest.raises(aiohttp.ClientResponseError):
                 await provider.get_properties()
 
 
@@ -133,9 +133,11 @@ class TestFieldMapping:
         alt_response = [
             {
                 "id": "res-alt",                       # `id` instead of `_id`
-                "firstName": "Carol",                  # firstName/lastName instead of guestFirst/Last
+                # firstName/lastName instead of guestFirstName/Last
+                "firstName": "Carol",
                 "lastName": "Lee",
-                "startDate": "2025-06-01T15:00:00Z",   # startDate instead of checkIn
+                # startDate instead of checkIn
+                "startDate": "2025-06-01T15:00:00Z",
                 "endDate": "2099-12-31T11:00:00Z",
                 "door_code": "9999",                   # snake_case
                 "reservationStatus": "accepted",       # reservationStatus instead of status
@@ -343,7 +345,7 @@ class TestCheckInTimeZoneConversion:
         # 16:00 Vienna summer = UTC+2 = 14:00 UTC
         assert data.current_guest.checkin.hour == 14
         assert data.current_guest.checkin.minute == 0
-        assert data.current_guest.checkin.tzinfo == timezone.utc
+        assert data.current_guest.checkin.tzinfo == UTC
 
     async def test_vienna_winter_4pm_local_is_15utc(self, provider, vienna_tz):
         """January is standard time in Vienna (UTC+1), so 16:00 local → 15:00 UTC."""
@@ -363,7 +365,7 @@ class TestCheckInTimeZoneConversion:
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 15
         # Date may roll forward, but the time-of-day in UTC is the test point.
-        assert data.current_guest.checkin.tzinfo == timezone.utc
+        assert data.current_guest.checkin.tzinfo == UTC
 
     async def test_iso_timestamp_with_z_is_treated_as_local(
         self, provider, vienna_tz
@@ -385,7 +387,7 @@ class TestCheckInTimeZoneConversion:
             data = await provider.get_property_data("listing-1")
         # 14:00 Vienna summer = UTC+2 → 12:00 UTC
         assert data.current_guest.checkin.hour == 12
-        assert data.current_guest.checkin.tzinfo == timezone.utc
+        assert data.current_guest.checkin.tzinfo == UTC
 
     async def test_pst_11am_iso_z_regression(self, provider, la_tz):
         """Regression: user reported 11 AM PST check-in showing as 4 AM.
@@ -408,7 +410,7 @@ class TestCheckInTimeZoneConversion:
         guest = data.next_guest or data.current_guest
         assert guest is not None
         assert guest.checkin.hour == 18
-        assert guest.checkin.tzinfo == timezone.utc
+        assert guest.checkin.tzinfo == UTC
 
     async def test_iso_timestamp_no_explicit_time_field(self, provider):
         """When there's no separate time field, the time portion of the

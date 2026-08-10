@@ -13,7 +13,7 @@
         "description": "Voer je API-inloggegevens in. {api_key_hint}",
         "data": {
           "api_key": "API-sleutel / Token",
-          "base_url": "Basis-URL (bv. https://je-server.com/api)"
+          "base_url": "Basis-URL"
         }
       },
       "property": {
@@ -108,7 +108,7 @@
         "name": "Schoonmaak gestart"
       },
       "mark_ready": {
-        "name": "Markeer als klaar"
+        "name": "Markeer huis als klaar"
       }
     }
   }

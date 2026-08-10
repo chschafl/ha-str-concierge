@@ -1,6 +1,5 @@
 {
   "name": "STR Concierge",
-  "description": "Door-lock-driven guest lifecycle and housekeeping state for your short-term rental. Syncs current booking from Host Tools, Hostfully, Guesty, or a custom backend.",
   "render_readme": true,
   "homeassistant": "2024.1.0"
 }

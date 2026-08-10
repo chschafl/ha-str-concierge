@@ -13,7 +13,7 @@
         "description": "Enter your API credentials. {api_key_hint}",
         "data": {
           "api_key": "API Key / Token",
-          "base_url": "Base URL (e.g. https://your-server.com/api)"
+          "base_url": "Base URL"
         }
       },
       "property": {
@@ -108,7 +108,7 @@
         "name": "Mark cleaning started"
       },
       "mark_ready": {
-        "name": "Mark ready"
+        "name": "Mark house ready"
       }
     }
   }

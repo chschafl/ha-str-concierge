@@ -1,13 +1,12 @@
 """Tests for STRCoordinator — state derivation, lock latch, departed dwell."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
 
 from custom_components.str_concierge.const import (
-    DEPARTED_DWELL_SECONDS,
     EVENT_GUEST_CHANGED,
     EVENT_HOUSE_STATE_CHANGED,
     GUEST_DEPARTED,
@@ -23,11 +22,11 @@ from custom_components.str_concierge.const import (
 from custom_components.str_concierge.coordinator import STRCoordinator
 from custom_components.str_concierge.providers.base import Guest, PropertyData
 
-from .conftest import CURRENT_GUEST, NEXT_GUEST, SAMPLE_PROPERTY_DATA
+from .conftest import CURRENT_GUEST, NEXT_GUEST
 
 
 def _utc(year, month, day, hour=12) -> datetime:
-    return datetime(year, month, day, hour, 0, 0, tzinfo=timezone.utc)
+    return datetime(year, month, day, hour, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture

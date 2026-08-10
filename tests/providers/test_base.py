@@ -1,15 +1,13 @@
 """Tests for the base data models and _pick_current_and_next logic."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import UTC, datetime, timedelta
 
 from custom_components.str_concierge.providers.base import Guest, PropertyData, STRProvider
 
 
 def _guest(booking_id: str, offset_hours_start: int, offset_hours_end: int) -> Guest:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return Guest(
         booking_id=booking_id,
         name=f"Guest {booking_id}",

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -75,7 +75,7 @@ class _StoredState:
         }
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any] | None) -> "_StoredState":
+    def from_dict(cls, raw: dict[str, Any] | None) -> _StoredState:
         if not raw:
             return cls()
         return cls(
@@ -88,7 +88,7 @@ class _StoredState:
 
 
 def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _parse_iso(value: str | None) -> datetime | None:

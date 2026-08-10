@@ -13,7 +13,7 @@
         "description": "Introduce tus credenciales de la API. {api_key_hint}",
         "data": {
           "api_key": "Clave / Token de API",
-          "base_url": "URL base (p. ej. https://tu-servidor.com/api)"
+          "base_url": "URL base"
         }
       },
       "property": {
@@ -108,7 +108,7 @@
         "name": "Marcar inicio de limpieza"
       },
       "mark_ready": {
-        "name": "Marcar como lista"
+        "name": "Marcar casa como lista"
       }
     }
   }

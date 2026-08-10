@@ -37,7 +37,7 @@ Out of the box you get:
 - **A "Guest Status" sensor** — `reserved` (booked, not here yet) → `due_in` (arriving soon) → `in_house` (currently here) → `departed` (just checked out) → `vacant` (no booking within the next *N* days — *N* is configurable, default 30). As soon as a guest goes `departed`, the next booking inside the threshold shows up so you always know who's coming.
 - **A "House State" sensor** — `ready` for the next guest, `occupied`, `dirty` (needs cleaning), `cleaning` (cleaner is on it)
 - **Current guest info** — name, check-in / check-out times, door code, calculated lock-access window
-- **Buttons for the cleaner** — "Mark Cleaning Started" and "Mark Ready" go right on a dashboard or HA mobile app
+- **Buttons for the cleaner** — "Mark Cleaning Started" and "Mark House Ready" go right on a dashboard or HA mobile app
 - **Reliable automation triggers** — the `departed` state is held for a deterministic window so auto-lock and away-mode automations fire every time
 
 ---
@@ -148,7 +148,7 @@ The integration creates a single **device** per property, with these entities gr
 | **Mark Guest Arrived** | Manual override if the lock event was missed |
 | **Mark Guest Departed** | Force the current guest to `departed` (auto-locks and notifies cleaner, same as a natural checkout) |
 | **Mark Cleaning Started** | House `dirty` → `cleaning` |
-| **Mark Ready** | House `cleaning` → `ready` |
+| **Mark House Ready** | House `cleaning` → `ready` |
 
 The cleaning buttons are designed to be put right on a dashboard or the HA mobile app — your cleaner can tap them on arrival and departure.
 
@@ -164,7 +164,7 @@ The integration is deliberately conservative about state transitions it can't be
 | `departed` → next guest / `vacant` | Automatic, 10 seconds after `departed`. Rotates to the next booking if one exists inside the vacancy threshold; else falls through to `vacant` |
 | House `occupied` → `dirty` | Automatic, the moment the guest goes `departed` |
 | House `dirty` → `cleaning` | Cleaner Keymaster slot PIN (if configured) **or** **Mark Cleaning Started** button |
-| House `cleaning` → `ready` | **Mark Ready** button — always manual |
+| House `cleaning` → `ready` | **Mark House Ready** button — always manual |
 
 In short: **departures and "cleaning finished"** are the two transitions that the integration won't decide on its own. You either hit the button, or you wire up an automation that does (a geofence on the cleaner's phone, an NFC tag in the property, an HA voice command — whatever fits your workflow).
 
@@ -204,7 +204,7 @@ stateDiagram-v2
     ready --> occupied : guest enters in_house\n(automatic)
     occupied --> dirty : guest enters departed\n(automatic)
     dirty --> cleaning : cleaner Keymaster PIN\nOR "Mark Cleaning Started"
-    cleaning --> ready : "Mark Ready" button\n(always manual)
+    cleaning --> ready : "Mark House Ready" button\n(always manual)
 ```
 
 #### Config knobs at a glance
@@ -368,7 +368,7 @@ automation:
 
 Create a second Keymaster code slot dedicated to your cleaner (e.g. `str_cleaner`) and give them a personal PIN. Then in **Settings → Devices & Services → STR Concierge → Configure**, set **Keymaster slot name (cleaner arrival)** to `str_cleaner`.
 
-From then on, when the cleaner enters their PIN and the house is `dirty`, the house state automatically flips to `cleaning` — your "house ready for cleaning" notification stops nagging you, and you have a timestamp of when work actually started. The cleaner still needs to press **Mark Ready** when they finish (or you can wire an automation off a geofence / NFC tag — see [What's automatic vs. what's manual](#whats-automatic-vs-whats-manual) above).
+From then on, when the cleaner enters their PIN and the house is `dirty`, the house state automatically flips to `cleaning` — your "house ready for cleaning" notification stops nagging you, and you have a timestamp of when work actually started. The cleaner still needs to press **Mark House Ready** when they finish (or you can wire an automation off a geofence / NFC tag — see [What's automatic vs. what's manual](#whats-automatic-vs-whats-manual) above).
 
 The cleaner slot listener is independent of the **Lock trigger source** setting. You can leave that on **Disabled** and still get the cleaner auto-detect — they're separate concerns.
 

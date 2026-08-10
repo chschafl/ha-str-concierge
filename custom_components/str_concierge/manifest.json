@@ -1,13 +1,13 @@
 {
   "domain": "str_concierge",
   "name": "STR Concierge",
-  "documentation": "https://github.com/chschafl/ha-str-concierge",
-  "issue_tracker": "https://github.com/chschafl/ha-str-concierge/issues",
-  "codeowners": ["@chschafl"],
-  "requirements": ["aiohttp>=3.9.0"],
-  "dependencies": [],
   "after_dependencies": [],
-  "version": "0.1.0",
+  "codeowners": ["@chschafl"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/chschafl/ha-str-concierge",
   "iot_class": "cloud_polling",
-  "config_flow": true
+  "issue_tracker": "https://github.com/chschafl/ha-str-concierge/issues",
+  "requirements": ["aiohttp>=3.9.0"],
+  "version": "0.1.0"
 }

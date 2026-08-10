@@ -1,8 +1,16 @@
-pytest==8.2.0
-pytest-asyncio==0.23.7
-pytest-homeassistant-custom-component==0.13.185
-pytest-cov==5.0.0
-aioresponses==0.7.6
-freezegun==1.5.0
+# pytest-homeassistant-custom-component drives a deep transitive tree
+# (it depends on `homeassistant` itself). We pin a recent floor — earlier
+# 0.13.x versions are stricter about aiohttp shutdown-thread cleanup
+# and fail in CI against our test patterns — and let pip resolve the
+# rest of the test toolchain to compatible versions.
+pytest-homeassistant-custom-component>=0.13.300
+
+# Test runner extras — let pip pick versions compatible with pytest-ha.
+pytest
+pytest-asyncio
+pytest-cov
+aioresponses
+
+# Lint + type-check
 ruff==0.4.4
 mypy==1.10.0
