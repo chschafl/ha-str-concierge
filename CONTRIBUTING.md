@@ -414,7 +414,7 @@ The first two you can — and should — run locally before pushing. The latter 
 
 ## Designers welcome too
 
-The integration ships with placeholder icon/logo PNGs under [`branding/`](branding/). If you can do better than the current cyan "STR" placeholder (and frankly, you can), the README in that directory walks through what's needed and how to submit real artwork to the [`home-assistant/brands`](https://github.com/home-assistant/brands) repo so it shows up in everyone's HA UI.
+The integration's icon and logo artwork lives in [`custom_components/str_concierge/brand/`](custom_components/str_concierge/brand/) — since Home Assistant 2026.3, that package folder is what HA loads at runtime. [docs/branding.md](docs/branding.md) covers the image specs, the light/dark variants, and the vector master to edit first. Refinements to the mark are welcome.
 
 ---
 

@@ -75,7 +75,7 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         if user_input is not None:
             self._provider = user_input[CONF_PROVIDER]
             return await self.async_step_credentials()
@@ -91,7 +91,7 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_credentials(
         self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -134,7 +134,7 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_property(
         self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -204,7 +204,7 @@ class STROptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.FlowResult:
+    ) -> config_entries.ConfigFlowResult:
         if user_input is not None:
             # Normalize unlock states (comma-separated string → list).
             raw_states = user_input.get(CONF_LOCK_UNLOCK_STATES, "")
