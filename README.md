@@ -60,6 +60,9 @@ If your PMS isn't listed and you'd like to use STR Concierge, the integration is
 
 ## Installation
 
+**Requires Home Assistant 2026.3.0 or newer.** HACS enforces this automatically; if you install
+manually, check your version first.
+
 ### Via HACS (recommended)
 
 1. Open HACS → **Integrations** → ⋮ menu → **Custom repositories**
