@@ -1,4 +1,4 @@
-"""Tests for the Host Tools provider (HTTP mocked with aioresponses)."""
+"""Tests for the Host Tools provider (HTTP mocked with tests/providers/http_mock.py)."""
 from __future__ import annotations
 
 import re
@@ -7,13 +7,14 @@ from zoneinfo import ZoneInfo
 
 import aiohttp
 import pytest
-from aioresponses import aioresponses
 from homeassistant.util import dt as dt_util
 
 from custom_components.str_concierge.providers.host_tools import (
     BASE_URL,
     HostToolsProvider,
 )
+
+from .http_mock import mock_http
 
 # The reservations endpoint embeds dates in the path, so tests match by regex.
 RESERVATIONS_URL_RE = re.compile(
@@ -68,14 +69,14 @@ def provider():
 
 class TestGetProperties:
     async def test_returns_listings_from_api(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE_URL}/getListings", payload=LISTINGS_RESPONSE)
             props = await provider.get_properties()
         assert [p.id for p in props] == ["listing-1", "listing-2"]
         assert props[0].name == "Beach House"
 
     async def test_handles_wrapped_envelope(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(
                 f"{BASE_URL}/getListings",
                 payload={"listings": LISTINGS_RESPONSE},
@@ -85,14 +86,14 @@ class TestGetProperties:
 
     async def test_alternate_listing_field_names(self, provider):
         alt = [{"id": "alt-1", "title": "Lakeside Loft"}]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE_URL}/getListings", payload=alt)
             props = await provider.get_properties()
         assert props[0].id == "alt-1"
         assert props[0].name == "Lakeside Loft"
 
     async def test_raises_on_http_error(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE_URL}/getListings", status=401)
             with pytest.raises(aiohttp.ClientResponseError):
                 await provider.get_properties()
@@ -100,7 +101,7 @@ class TestGetProperties:
 
 class TestGetPropertyData:
     async def test_current_and_next_resolved(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=RESERVATIONS_RESPONSE)
             data = await provider.get_property_data("listing-1")
 
@@ -114,14 +115,14 @@ class TestGetPropertyData:
 
     async def test_cancelled_and_blocked_are_filtered_out(self, provider):
         """Cancelled / blocked entries must not show up as `current` or `next`."""
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=RESERVATIONS_RESPONSE)
             data = await provider.get_property_data("listing-1")
         # res-cancelled and res-block must not bleed in.
         assert data.next_guest.booking_id == "res-002"
 
     async def test_no_reservations_returns_none_guests(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=[])
             data = await provider.get_property_data("listing-1")
         assert data.current_guest is None
@@ -143,7 +144,7 @@ class TestFieldMapping:
                 "reservationStatus": "accepted",       # reservationStatus instead of status
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=alt_response)
             data = await provider.get_property_data("listing-1")
 
@@ -163,7 +164,7 @@ class TestFieldMapping:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=alt_response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.name == "Single Name"
@@ -172,7 +173,7 @@ class TestFieldMapping:
 class TestAuthHeader:
     async def test_sends_authToken_header_not_bearer(self, provider):
         """Host Tools uses `authToken: <key>`, not Authorization: Bearer."""
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE_URL}/getListings", payload=[])
             await provider.get_properties()
             (call_args,) = next(iter(m.requests.values()))
@@ -224,7 +225,7 @@ class TestCheckInOutTimes:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         # HA tz is UTC, so 16:00 local == 16:00 UTC.
@@ -244,7 +245,7 @@ class TestCheckInOutTimes:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 15
@@ -262,7 +263,7 @@ class TestCheckInOutTimes:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 16
@@ -280,7 +281,7 @@ class TestCheckInOutTimes:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert (data.current_guest.checkin.hour, data.current_guest.checkin.minute) == (15, 30)
@@ -298,7 +299,7 @@ class TestCheckInOutTimes:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 14
@@ -315,7 +316,7 @@ class TestCheckInOutTimes:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 0
@@ -339,7 +340,7 @@ class TestCheckInTimeZoneConversion:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         # 16:00 Vienna summer = UTC+2 = 14:00 UTC
@@ -360,7 +361,7 @@ class TestCheckInTimeZoneConversion:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 15
@@ -382,7 +383,7 @@ class TestCheckInTimeZoneConversion:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         # 14:00 Vienna summer = UTC+2 → 12:00 UTC
@@ -402,7 +403,7 @@ class TestCheckInTimeZoneConversion:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         # Booking is in the future → lands in next_guest. 11 AM PDT (May 31
@@ -425,7 +426,7 @@ class TestCheckInTimeZoneConversion:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.checkin.hour == 14
@@ -444,7 +445,7 @@ class TestDoorCode:
                 "status": "accepted",
             }
         ]
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(RESERVATIONS_URL_RE, payload=response)
             data = await provider.get_property_data("listing-1")
         assert data.current_guest.door_code == "9876"
@@ -462,7 +463,7 @@ class TestDoorCode:
                     "status": "accepted",
                 }
             ]
-            with aioresponses() as m:
+            with mock_http() as m:
                 m.get(RESERVATIONS_URL_RE, payload=response)
                 data = await provider.get_property_data("listing-1")
             assert data.current_guest.door_code == "1111", f"failed for key={key}"

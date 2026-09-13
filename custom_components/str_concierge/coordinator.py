@@ -152,6 +152,19 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         self._previous_status: str | None = None
         self._previous_house_state: str | None = None
 
+    async def async_shutdown(self) -> None:
+        """Cancel the pending departed-dwell timer, then shut down as usual.
+
+        The dwell timer is a one-shot `async_call_later` that can be armed for
+        minutes. Without this, unloading or reloading the entry mid-dwell leaves
+        it running and it later fires `_rotate` against a coordinator whose
+        entry is gone.
+        """
+        if self._dwell_cancel is not None:
+            self._dwell_cancel()
+            self._dwell_cancel = None
+        await super().async_shutdown()
+
     @property
     def provider(self) -> STRProvider:
         return self._provider

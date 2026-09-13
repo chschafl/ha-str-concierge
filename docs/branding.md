@@ -28,18 +28,73 @@ every PNG above is exported from it, so edit the SVG first.
 
 ## How Home Assistant picks them up
 
-Since **Home Assistant 2026.3**, a custom integration can ship brand images inside its own
-package in a `brand/` folder, served through the brands proxy API. Local brand images take
-priority over the brands CDN, with no extra configuration. They drive the integration card, the
-config flow header, and the device pages.
+Since **Home Assistant 2026.3**, a custom integration ships brand images inside its own package
+in a `brand/` folder, and the `brands` system integration serves them from
+`/api/brands/integration/<domain>/<image>`
+([announcement](https://developers.home-assistant.io/blog/2026/02/24/brands-proxy-api)). They
+drive the integration card, the config flow header, and the device pages. No extra
+configuration — no manifest key, no static path registration.
+
+The lookup HA performs is deliberately cheap, and both halves have to hit:
+
+1. `"brand" in os.listdir(<integration dir>)` — the `Integration.has_branding` flag, computed
+   from a directory listing taken **once per HA start**.
+2. `<integration dir>/brand/<image>` exists, where `<image>` is one of the eight names in the
+   table above.
+
+Only those eight names are servable. A request for a name that isn't there falls through to the
+brands CDN, and the CDN has nothing for this domain, so the user gets the generic
+"image not found" placeholder rather than our mark. That's the whole failure mode, and
+[`tests/test_brand_assets.py`](../tests/test_brand_assets.py) guards against it: it asserts the
+folder sits where HA computes it, holds exactly those eight PNGs and no misnamed extras, and
+that each decodes at the spec'd size. It then drives a real Home Assistant through
+`/api/brands/integration/str_concierge/<image>` for all eight and asserts the response bytes are
+ours — so CI proves the artwork is actually being served, not merely present on disk.
 
 Submitting to the [`home-assistant/brands`](https://github.com/home-assistant/brands) repo is
-**not required** for custom integrations — its `custom_integrations/` folder is a legacy path.
+**not** an option any more, not merely unnecessary: that repo's `custom_integrations/` folder is
+a legacy path and its PR template states custom-component additions are no longer accepted. The
+in-package folder is the only route.
 
 `hacs.json` sets the minimum Home Assistant version to `2026.3.0` to match, so every install
 that can add the integration renders the real artwork. If that floor is ever lowered, older
-installs will fall back to the generic gear icon — nothing was ever submitted to the brands CDN
-for this domain, so there is no CDN fallback to catch them.
+installs will fall back to the generic gear icon — there is no CDN fallback to catch them.
+
+## Still seeing the "image not found" placeholder?
+
+The placeholder is served by HA itself when the local lookup misses, so it tells you the request
+reached the brands API and found nothing. Work through this in order:
+
+1. **Check the installed copy, not the repo.** `config/custom_components/str_concierge/brand/`
+   has to contain the PNGs. HACS downloads the whole integration directory from the default
+   branch, so a download taken before the artwork landed won't have it — re-download in HACS. A
+   manual install needs `cp -r` of the entire package directory, not just the `.py` files.
+2. **Restart Home Assistant.** `has_branding` comes from a directory listing cached for the
+   lifetime of the process. Dropping `brand/` into a running instance — or reloading the
+   integration — changes nothing until a full restart.
+3. **Hard-refresh the browser.** The proxy returns the raw PNG bytes, and browsers will happily
+   keep serving the placeholder they cached earlier.
+4. **Ask the API directly.** With a long-lived access token:
+
+   ```bash
+   curl -sI -H "Authorization: Bearer $HA_TOKEN" \
+     "http://homeassistant.local:8123/api/brands/integration/str_concierge/icon.png?placeholder=no"
+   ```
+
+   `?placeholder=no` turns the silent placeholder fallback into a `404`, which is what makes this
+   worth running: `200` means HA is serving our file and any remaining problem is display-side,
+   `404` means steps 1–2 aren't satisfied yet.
+
+### HACS's own panel is a separate story
+
+The HACS dashboard and downloads panel still resolve icons through HACS's own data service and
+the old brands CDN rather than HA's brands proxy, so custom integrations that ship artwork
+in-package show as "icon not available" *there* while rendering correctly in
+**Settings → Devices & Services** (hacs/integration [#5171](https://github.com/hacs/integration/issues/5171),
+[#5223](https://github.com/hacs/integration/issues/5223)). Since the brands repo no longer
+accepts custom-integration PRs, there is no CDN copy that would satisfy HACS either. Nothing in
+this repo can fix that one — it needs a HACS frontend release. HA's own integration list is the
+surface to judge by.
 
 ## Updating the artwork
 

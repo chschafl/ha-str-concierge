@@ -18,12 +18,12 @@ jobs:
     name: Ruff
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements_test.txt
 
@@ -38,14 +38,16 @@ jobs:
     name: Pytest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
-          # pytest-homeassistant-custom-component 0.13.185 requires >=3.12.
-          # Pin 3.13 to match local dev (see CONTRIBUTING.md).
-          python-version: "3.13"
+          # Home Assistant 2026.3+ requires Python >= 3.14.2, and so does the
+          # pytest-homeassistant-custom-component that carries it. Anything
+          # older silently resolves to a pre-2026.3 core (see
+          # requirements_test.txt).
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements_test.txt
 
@@ -61,7 +63,7 @@ jobs:
     name: Hassfest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Official HA validator. Runs the same checks core HA uses on built-in
       # integrations: manifest schema, domain naming, version bumps, etc.
       - uses: home-assistant/actions/hassfest@master
@@ -70,7 +72,7 @@ jobs:
     name: HACS validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # HACS-specific validator. Verifies hacs.json, manifest.json, and that
       # the repo layout matches what HACS expects of an integration.
       - uses: hacs/action@main
