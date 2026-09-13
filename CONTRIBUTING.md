@@ -138,7 +138,7 @@ The fastest workflow is **symlink the integration into a local HA, edit files in
 
 ### Getting Python set up on macOS
 
-You need Python **3.13 or newer** to run the test suite (the pinned `pytest-homeassistant-custom-component` requires it). macOS ships with a Python in `/usr/bin/python3`, but it's locked to whatever version Apple decided, and you really don't want to `pip install` into it. Pick one of these instead:
+You need Python **3.14.2 or newer** to run the test suite — Home Assistant 2026.3+ requires it, and so does the `pytest-homeassistant-custom-component` that carries it. macOS ships with a Python in `/usr/bin/python3`, but it's locked to whatever version Apple decided, and you really don't want to `pip install` into it. Pick one of these instead:
 
 #### Option A — VS Code Dev Container (zero Python install on your Mac)
 
@@ -160,9 +160,9 @@ brew install pyenv
 echo 'eval "$(pyenv init -)"' >> ~/.zshrc   # or ~/.bash_profile
 exec $SHELL                                  # reload your shell
 
-pyenv install 3.13                           # download + build Python 3.13
+pyenv install 3.14                           # download + build Python 3.14
 cd /path/to/ha-str-concierge
-pyenv local 3.13                             # pins this repo to 3.13 via a .python-version file
+pyenv local 3.14                             # pins this repo to 3.14 via a .python-version file
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements_test.txt
 ```
@@ -172,9 +172,9 @@ Best for: regular contributors. You get a per-project Python version, isolated v
 #### Option C — Homebrew (simplest if you don't care about version juggling)
 
 ```bash
-brew install python@3.13
+brew install python@3.14
 cd /path/to/ha-str-concierge
-python3.13 -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 pip install -r requirements_test.txt
 ```
 
@@ -397,7 +397,7 @@ Before opening a PR:
 | Job | What it runs | Reproduce locally |
 |---|---|---|
 | **Ruff** | `ruff check custom_components/ tests/` | `make lint` |
-| **Pytest** | Full test suite under Python 3.13 with coverage | `make test` |
+| **Pytest** | Full test suite under Python 3.14 with coverage | `make test` |
 | **Hassfest** | HA's official manifest + structure validator | — (CI only) |
 | **HACS validation** | HACS's integration validator (`hacs.json` schema, repo layout) | — (CI only) |
 

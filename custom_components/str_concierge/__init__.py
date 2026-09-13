@@ -127,6 +127,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if entry_data:
             for unsub in entry_data.get("unsubscribers", []):
                 unsub()
+            await entry_data["coordinator"].async_shutdown()
     return unload_ok
 
 

@@ -47,7 +47,9 @@ brands CDN, and the CDN has nothing for this domain, so the user gets the generi
 "image not found" placeholder rather than our mark. That's the whole failure mode, and
 [`tests/test_brand_assets.py`](../tests/test_brand_assets.py) guards against it: it asserts the
 folder sits where HA computes it, holds exactly those eight PNGs and no misnamed extras, and
-that each decodes at the spec'd size.
+that each decodes at the spec'd size. It then drives a real Home Assistant through
+`/api/brands/integration/str_concierge/<image>` for all eight and asserts the response bytes are
+ours — so CI proves the artwork is actually being served, not merely present on disk.
 
 Submitting to the [`home-assistant/brands`](https://github.com/home-assistant/brands) repo is
 **not** an option any more, not merely unnecessary: that repo's `custom_integrations/` folder is

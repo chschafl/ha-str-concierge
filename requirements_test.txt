@@ -1,16 +1,22 @@
 # pytest-homeassistant-custom-component drives a deep transitive tree
-# (it depends on `homeassistant` itself). We pin a recent floor — earlier
-# 0.13.x versions are stricter about aiohttp shutdown-thread cleanup
-# and fail in CI against our test patterns — and let pip resolve the
-# rest of the test toolchain to compatible versions.
-pytest-homeassistant-custom-component>=0.13.300
+# (it depends on `homeassistant` itself), and its version is what decides
+# which Home Assistant the suite runs against. The floor has to keep us on
+# an HA at or above the 2026.3.0 that hacs.json declares — otherwise CI
+# would be green against a core that has no brands proxy and no
+# `Integration.has_branding`, i.e. against code this integration doesn't
+# support. 0.13.365 pins HA 2026.9.2, which needs Python >= 3.14.2.
+pytest-homeassistant-custom-component>=0.13.365
 
 # Test runner extras — let pip pick versions compatible with pytest-ha.
 pytest
 pytest-asyncio
 pytest-cov
-aioresponses
+
+# NB: no aioresponses. It constructs real aiohttp.ClientResponse objects, so
+# aiohttp 3.14 making `stream_writer` a required argument broke it, and it
+# would hold the whole suite back to an older HA. Provider tests use
+# tests/providers/http_mock.py instead.
 
 # Lint + type-check
-ruff==0.4.4
-mypy==1.10.0
+ruff==0.16.7
+mypy==2.3.1

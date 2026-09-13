@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import pytest
-from aioresponses import aioresponses
 
 from custom_components.str_concierge.providers.custom_endpoint import CustomEndpointProvider
+
+from .http_mock import mock_http
 
 BASE = "https://my-api.example.com/api"
 
@@ -29,14 +30,14 @@ def provider():
 
 class TestCustomEndpoint:
     async def test_get_properties(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE}/properties", payload=PROPS_RESPONSE)
             props = await provider.get_properties()
         assert props[0].id == "p1"
         assert props[0].name == "My Villa"
 
     async def test_get_property_data(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(
                 f"{BASE}/properties/p1/reservations",
                 payload=RESERVATIONS_RESPONSE,
@@ -46,7 +47,7 @@ class TestCustomEndpoint:
         assert data.current_guest.door_code == "4321"
 
     async def test_mark_arrive(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             # mark_arrived needs the property_id, which is stashed by the
             # first get_property_data call.
             m.get(f"{BASE}/properties/p1/reservations", payload=[])
@@ -59,7 +60,7 @@ class TestCustomEndpoint:
         assert result is True
 
     async def test_mark_checkout(self, provider):
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE}/properties/p1/reservations", payload=[])
             m.post(
                 f"{BASE}/properties/p1/reservations/r1/checkout",
@@ -78,6 +79,6 @@ class TestCustomEndpoint:
 
     async def test_trailing_slash_stripped(self):
         p = CustomEndpointProvider(api_key="t", base_url=f"{BASE}/")
-        with aioresponses() as m:
+        with mock_http() as m:
             m.get(f"{BASE}/properties", payload=[])
             await p.get_properties()

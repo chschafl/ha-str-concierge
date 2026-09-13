@@ -118,3 +118,32 @@ class TestBrandImageFiles:
             low, high = LOGO_BOUNDS[name]
             assert width > height, "logos are landscape"
             assert low <= height <= high
+
+
+class TestBrandsProxy:
+    """End-to-end through the API the frontend actually calls.
+
+    Everything above checks the files on disk. This checks that Home Assistant
+    resolves them — `Integration.has_branding`, then the local file read — and
+    hands back our bytes rather than falling through to the brands CDN.
+    """
+
+    @pytest.mark.parametrize("name", sorted(ALLOWED_IMAGES))
+    async def test_serves_our_file_not_the_cdn_placeholder(
+        self, hass, hass_client, enable_custom_integrations, name: str
+    ):
+        from homeassistant.setup import async_setup_component
+
+        assert await async_setup_component(hass, "brands", {})
+        await hass.async_block_till_done()
+
+        client = await hass_client()
+        # placeholder=no turns the silent CDN placeholder fallback into a 404,
+        # so a miss fails loudly here instead of returning someone else's image.
+        resp = await client.get(
+            f"/api/brands/integration/str_concierge/{name}?placeholder=no"
+        )
+
+        assert resp.status == 200
+        assert resp.content_type == "image/png"
+        assert await resp.read() == (BRAND_DIR / name).read_bytes()

@@ -30,7 +30,7 @@ def _utc(year, month, day, hour=12) -> datetime:
 
 
 @pytest.fixture
-def coordinator(hass, mock_provider):
+async def coordinator(hass, mock_provider):
     coord = STRCoordinator(
         hass=hass,
         provider=mock_provider,
@@ -47,7 +47,11 @@ def coordinator(hass, mock_provider):
     with patch.object(coord, "_persist", return_value=None) as _:
         coord._persist_patched = True
     coord._persist = lambda: _async_noop()
-    return coord
+    yield coord
+    # The methods under test call async_request_refresh(), which arms the
+    # DataUpdateCoordinator debouncer. HA's test harness fails any test that
+    # leaves a timer behind, so tear the coordinator down explicitly.
+    await coord.async_shutdown()
 
 
 async def _async_noop():
