@@ -414,7 +414,7 @@ The first two you can — and should — run locally before pushing. The latter 
 
 ## Designers welcome too
 
-The integration's icon and logo artwork lives in [`custom_components/str_concierge/brand/`](custom_components/str_concierge/brand/) — since Home Assistant 2026.3, that package folder is what HA loads at runtime. [docs/branding.md](docs/branding.md) covers the image specs, the light/dark variants, and the vector master to edit first. Refinements to the mark are welcome.
+The integration's icon and logo artwork lives in [`custom_components/str_concierge/brand/`](custom_components/str_concierge/brand/) — since Home Assistant 2026.3, that package folder is what HA loads at runtime. [docs/branding.md](docs/branding.md) covers the image specs, the light/dark variants, the vector master to edit first, and what to check when HA shows the "image not found" placeholder instead. Keep all eight PNG names in place when you re-export — `tests/test_brand_assets.py` fails the build if one goes missing or changes size. Refinements to the mark are welcome.
 
 ---
 
