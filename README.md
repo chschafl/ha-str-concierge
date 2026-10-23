@@ -1,4 +1,9 @@
-# 🏡 STR Concierge for Home Assistant
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chschafl/ha-str-concierge/main/custom_components/str_concierge/brand/dark_logo@2x.png">
+  <img src="https://raw.githubusercontent.com/chschafl/ha-str-concierge/main/custom_components/str_concierge/brand/logo@2x.png" alt="STR Concierge" width="348">
+</picture>
+
+# STR Concierge for Home Assistant
 
 [![HACS Custom][hacs-badge]][hacs-url]
 [![GitHub release][release-badge]][release-url]
