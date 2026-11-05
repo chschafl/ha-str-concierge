@@ -6,7 +6,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
@@ -101,6 +101,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await coordinator.async_config_entry_first_refresh()
+    except ConfigEntryAuthFailed:
+        # Let HA start the reauth flow instead of retrying with a bad key.
+        raise
     except Exception as err:
         raise ConfigEntryNotReady(f"Could not fetch initial data: {err}") from err
 

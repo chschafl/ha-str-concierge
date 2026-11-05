@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -35,7 +36,7 @@ from .const import (
     STORAGE_KEY,
     STORAGE_VERSION,
 )
-from .providers.base import Guest, PropertyData, STRProvider
+from .providers.base import Guest, PropertyData, STRProvider, is_auth_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -306,6 +307,12 @@ class STRCoordinator(DataUpdateCoordinator[STRState]):
         try:
             pd = await self._provider.get_property_data(self._property_id)
         except Exception as err:
+            if is_auth_error(err):
+                # Surfaces HA's "Re-authenticate" repair so the user can paste
+                # a new API key without deleting the entry.
+                raise ConfigEntryAuthFailed(
+                    f"Provider rejected the API key: {err}"
+                ) from err
             raise UpdateFailed(f"Error fetching property {self._property_id}: {err}") from err
 
         _LOGGER.debug(
