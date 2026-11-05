@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
@@ -43,6 +44,7 @@ from .const import (
     PROVIDER_OPTIONS,
 )
 from .providers import create_provider
+from .providers.base import Property, is_auth_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +62,29 @@ _LOCK_TRIGGER_LABELS = {
 }
 
 _NEEDS_BASE_URL = {PROVIDER_CUSTOM}
+
+
+def _api_key_hint(provider: str | None) -> str:
+    if provider == PROVIDER_GUESTY:
+        return "Format: client_id:client_secret"
+    if provider == PROVIDER_HOSTFULLY:
+        return "Your Hostfully API key"
+    return "Your API token / key"
+
+
+async def _async_fetch_properties(
+    provider_type: str | None, api_key: str, base_url: str | None
+) -> tuple[list[Property], str | None]:
+    """Validate credentials by listing properties.
+
+    Returns ``(properties, error_key)``; ``error_key`` is ``None`` on success.
+    """
+    try:
+        provider = create_provider(provider_type, api_key, base_url)
+        return await provider.get_properties(), None
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Credential validation error: %s", err)
+        return [], "invalid_auth" if is_auth_error(err) else "cannot_connect"
 
 
 class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -98,14 +123,11 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._api_key = user_input[CONF_API_KEY]
             self._base_url = user_input.get(CONF_BASE_URL)
 
-            try:
-                provider = create_provider(
-                    self._provider, self._api_key, self._base_url
-                )
-                props = await provider.get_properties()
-            except Exception as err:
-                _LOGGER.debug("Credential validation error: %s", err)
-                errors["base"] = "cannot_connect"
+            props, error = await _async_fetch_properties(
+                self._provider, self._api_key, self._base_url
+            )
+            if error:
+                errors["base"] = error
             else:
                 self._available_properties = [
                     {"id": p.id, "name": p.name} for p in props
@@ -117,13 +139,7 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if needs_url:
             schema_dict[vol.Required(CONF_BASE_URL)] = str
 
-        description_placeholders = {}
-        if self._provider == PROVIDER_GUESTY:
-            description_placeholders["api_key_hint"] = "Format: client_id:client_secret"
-        elif self._provider == PROVIDER_HOSTFULLY:
-            description_placeholders["api_key_hint"] = "Your Hostfully API key"
-        else:
-            description_placeholders["api_key_hint"] = "Your API token / key"
+        description_placeholders = {"api_key_hint": _api_key_hint(self._provider)}
 
         return self.async_show_form(
             step_id="credentials",
@@ -182,6 +198,91 @@ class STRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="property",
             data_schema=schema,
             errors=errors,
+        )
+
+    # ── Reconfigure (Settings → Devices & Services → ⋮ → Reconfigure) ──
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Let the user replace the API key (and base URL) of an existing entry."""
+        entry = self._get_reconfigure_entry()
+        return await self._async_update_credentials(
+            "reconfigure", entry, user_input, allow_base_url=True
+        )
+
+    # ── Reauth (triggered automatically when the provider returns 401/403) ──
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> config_entries.ConfigFlowResult:
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        entry = self._get_reauth_entry()
+        return await self._async_update_credentials(
+            "reauth_confirm", entry, user_input, allow_base_url=False
+        )
+
+    async def _async_update_credentials(
+        self,
+        step_id: str,
+        entry: config_entries.ConfigEntry,
+        user_input: dict[str, Any] | None,
+        *,
+        allow_base_url: bool,
+    ) -> config_entries.ConfigFlowResult:
+        """Shared form for reconfigure + reauth.
+
+        Validates the new credential against the provider and makes sure it
+        still sees the property this entry tracks, then updates the entry in
+        place — entity IDs, history, and options are preserved.
+        """
+        provider_type = entry.data[CONF_PROVIDER]
+        property_id = entry.data[CONF_PROPERTY_ID]
+        needs_url = allow_base_url and provider_type in _NEEDS_BASE_URL
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            api_key = user_input[CONF_API_KEY]
+            base_url = (
+                user_input.get(CONF_BASE_URL)
+                if needs_url
+                else entry.data.get(CONF_BASE_URL)
+            )
+            props, error = await _async_fetch_properties(
+                provider_type, api_key, base_url
+            )
+            if error:
+                errors["base"] = error
+            elif not any(p.id == property_id for p in props):
+                errors["base"] = "property_not_found"
+            else:
+                data_updates: dict[str, Any] = {CONF_API_KEY: api_key}
+                if needs_url:
+                    data_updates[CONF_BASE_URL] = base_url
+                return self.async_update_reload_and_abort(
+                    entry, data_updates=data_updates
+                )
+
+        schema_dict: dict = {vol.Required(CONF_API_KEY): str}
+        if needs_url:
+            schema_dict[
+                vol.Required(
+                    CONF_BASE_URL, default=entry.data.get(CONF_BASE_URL) or ""
+                )
+            ] = str
+
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=vol.Schema(schema_dict),
+            errors=errors,
+            description_placeholders={
+                "api_key_hint": _api_key_hint(provider_type),
+                "property_name": entry.data.get(CONF_PROPERTY_NAME, property_id),
+            },
         )
 
     def _entry_title(self) -> str:

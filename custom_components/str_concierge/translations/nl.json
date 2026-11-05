@@ -23,14 +23,33 @@
           "property_id": "Accommodatie",
           "poll_interval": "Polling-interval (seconden)"
         }
+      },
+      "reconfigure": {
+        "title": "API-inloggegevens bijwerken",
+        "description": "Voer een nieuwe API-sleutel in voor **{property_name}**. Entiteiten, geschiedenis en opties blijven behouden. {api_key_hint}",
+        "data": {
+          "api_key": "API-sleutel / Token",
+          "base_url": "Basis-URL"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Opnieuw authenticeren",
+        "description": "De provider heeft de opgeslagen API-sleutel voor **{property_name}** geweigerd. Voer een nieuwe in. {api_key_hint}",
+        "data": {
+          "api_key": "API-sleutel / Token"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Kan geen verbinding maken met de provider. Controleer je inloggegevens en netwerk."
+      "cannot_connect": "Kan geen verbinding maken met de provider. Controleer je inloggegevens en netwerk.",
+      "invalid_auth": "De provider heeft deze inloggegevens geweigerd. Controleer de API-sleutel.",
+      "property_not_found": "Deze inloggegevens werken, maar hebben geen toegang tot de accommodatie van deze integratie."
     },
     "abort": {
       "no_properties": "Er zijn geen accommodaties gevonden voor dit account.",
-      "already_configured": "Dit account is al geconfigureerd."
+      "already_configured": "Dit account is al geconfigureerd.",
+      "reconfigure_successful": "Inloggegevens bijgewerkt.",
+      "reauth_successful": "Opnieuw authenticeren gelukt."
     }
   },
   "options": {

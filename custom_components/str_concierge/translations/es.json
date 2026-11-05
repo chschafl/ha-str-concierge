@@ -23,14 +23,33 @@
           "property_id": "Propiedad",
           "poll_interval": "Intervalo de sondeo (segundos)"
         }
+      },
+      "reconfigure": {
+        "title": "Actualizar credenciales de la API",
+        "description": "Introduce una nueva clave de API para **{property_name}**. Se conservan las entidades, el historial y las opciones. {api_key_hint}",
+        "data": {
+          "api_key": "Clave / Token de API",
+          "base_url": "URL base"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Volver a autenticar",
+        "description": "El proveedor rechazó la clave de API guardada para **{property_name}**. Introduce una nueva. {api_key_hint}",
+        "data": {
+          "api_key": "Clave / Token de API"
+        }
       }
     },
     "error": {
-      "cannot_connect": "No se puede conectar con el proveedor. Verifica tus credenciales y tu red."
+      "cannot_connect": "No se puede conectar con el proveedor. Verifica tus credenciales y tu red.",
+      "invalid_auth": "El proveedor rechazó estas credenciales. Verifica la clave de API.",
+      "property_not_found": "Las credenciales funcionan, pero no tienen acceso a la propiedad de esta entrada."
     },
     "abort": {
       "no_properties": "No se encontraron propiedades para esta cuenta.",
-      "already_configured": "Esta cuenta ya está configurada."
+      "already_configured": "Esta cuenta ya está configurada.",
+      "reconfigure_successful": "Credenciales actualizadas.",
+      "reauth_successful": "Reautenticación correcta."
     }
   },
   "options": {

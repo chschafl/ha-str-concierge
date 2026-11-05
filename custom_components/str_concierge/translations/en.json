@@ -23,14 +23,33 @@
           "property_id": "Property",
           "poll_interval": "Polling Interval (seconds)"
         }
+      },
+      "reconfigure": {
+        "title": "Update API credentials",
+        "description": "Enter a new API key for **{property_name}**. Entities, history and options are kept. {api_key_hint}",
+        "data": {
+          "api_key": "API Key / Token",
+          "base_url": "Base URL"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "The provider rejected the stored API key for **{property_name}**. Enter a new one. {api_key_hint}",
+        "data": {
+          "api_key": "API Key / Token"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to the provider. Check your credentials and network."
+      "cannot_connect": "Cannot connect to the provider. Check your credentials and network.",
+      "invalid_auth": "The provider rejected these credentials. Check the API key.",
+      "property_not_found": "These credentials work, but they can't see the property this entry tracks."
     },
     "abort": {
       "no_properties": "No properties were found for this account.",
-      "already_configured": "This account is already configured."
+      "already_configured": "This account is already configured.",
+      "reconfigure_successful": "Credentials updated.",
+      "reauth_successful": "Re-authentication successful."
     }
   },
   "options": {

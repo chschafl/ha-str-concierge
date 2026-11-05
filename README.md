@@ -105,6 +105,8 @@ Pick which PMS you use. If you run your own backend, choose **Custom Endpoint**.
 
 The integration validates your credentials live — if it can't connect, you'll get a clear error before you continue.
 
+**Changing the API key later:** go to **Settings → Devices & Services → STR Concierge**, open the entry's **⋮** menu and choose **Reconfigure**. Paste the new key (Custom Endpoint can also change its base URL). The entry is updated in place, so entities, history and options are kept. If the provider starts rejecting the stored key (HTTP 401/403), Home Assistant shows a **Re-authenticate** prompt that does the same thing.
+
 ### 3 · Pick the property
 Choose which property this integration entry should track. (One property per entry — if you have multiple listings, add another integration entry per listing.) Set how often to check for booking updates (default: 5 minutes).
 
