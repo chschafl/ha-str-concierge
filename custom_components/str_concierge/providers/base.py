@@ -6,6 +6,20 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 
+import aiohttp
+
+# HTTP statuses that mean "the credential is wrong/revoked" rather than a
+# transient outage. Used to trigger HA's re-authentication flow.
+AUTH_ERROR_STATUSES = frozenset({401, 403})
+
+
+def is_auth_error(err: BaseException) -> bool:
+    """Return True if *err* is an HTTP error caused by a rejected credential."""
+    return (
+        isinstance(err, aiohttp.ClientResponseError)
+        and err.status in AUTH_ERROR_STATUSES
+    )
+
 
 @dataclass
 class Guest:
